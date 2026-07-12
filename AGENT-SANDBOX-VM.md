@@ -2,8 +2,6 @@
 
 > **Scope:** [`kubernetes-sigs/agent-sandbox`](https://github.com/kubernetes-sigs/agent-sandbox) only (fork branch [`kubevirt-backend`](https://github.com/shanemcd/agent-sandbox/tree/kubevirt-backend)). No OpenShell, Hermes, or NemoClaw. Use this to walk a reviewer through what the controller actually does when `runtimeBackend: VirtualMachine`.
 
-**Branch tip (as of 2026-07-12):** `99bd732` virtio guest metadata · `e324bbf` optional KubeVirt RBAC.
-
 ---
 
 ## What you are demonstrating
