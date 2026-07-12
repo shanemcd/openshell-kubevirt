@@ -137,6 +137,11 @@ mount_secret_disk() {
   mount_ro_stage "$device" "$stage"
   copy_secret_tree "$stage" "$mount_path"
   chmod -R a+rX "$mount_path" 2>/dev/null || true
+  # OpenShell SA bootstrap JWT is for the supervisor only (IssueSandboxToken).
+  # Do not leave it world-readable for the landlocked sandbox user.
+  if [ "$serial" = "openshellsatoken" ] || [ "$mount_path" = "/var/run/secrets/openshell" ]; then
+    find "$mount_path" -type f -name token -exec chmod 0400 {} + 2>/dev/null || true
+  fi
   if command -v restorecon >/dev/null 2>&1; then
     restorecon -RF "$mount_path" 2>/dev/null || true
   fi
