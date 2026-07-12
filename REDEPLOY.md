@@ -47,7 +47,7 @@ oc -n openshell patch sts openshell --type=json -p="[{
 oc -n openshell delete pod openshell-0 --wait=false
 ```
 
-If CRC cannot pull GHCR, mirror into the OpenShift registry first, then pin to that ImageStream digest (same idea as the old `istag` flow in [`VM-HERMES-BLOCKER.md`](./VM-HERMES-BLOCKER.md)).
+If CRC cannot pull GHCR, mirror into the OpenShift registry first, then pin to that ImageStream digest (same idea as the old `istag` flow in [`TRACKING.md`](./TRACKING.md)).
 
 After controller rollout, keep optional KubeVirt RBAC bound (from an agent-sandbox checkout):
 

@@ -367,4 +367,4 @@ Core demo does **not** require extensions — a bare `Sandbox` is enough.
 
 ## Out of scope here
 
-OpenShell drivers, Hermes bootc images, Slack, day-2 SSH via `virtctl credentials`, and CRC-specific deploy notes live in [`VM-HERMES-BLOCKER.md`](./VM-HERMES-BLOCKER.md). This document stops at what agent-sandbox owns.
+OpenShell drivers, Hermes bootc images, day-2 SSH via `virtctl credentials`, and CRC-specific deploy notes live in [`TRACKING.md`](./TRACKING.md). This document stops at what agent-sandbox owns.

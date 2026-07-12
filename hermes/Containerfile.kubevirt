@@ -1,0 +1,117 @@
+## OpenShell supervisor image (scratch + /openshell-sandbox).
+## Build with OpenShell's docker-build-image.sh supervisor, then tag locally, e.g.:
+##   podman tag openshell/supervisor:dev localhost/openshell-supervisor:kubevirt
+## ARG that feeds FROM must be declared before any FROM.
+## Context: openshell-kubevirt/hermes/ (this file's directory).
+ARG OPENSHELL_SUPERVISOR_IMAGE=localhost/openshell-supervisor:kubevirt
+
+## Stage 1: NemoClaw Hermes built from shanemcd/NemoClaw kubevirt-sidecar.
+## Do not use nemoclaw-hermes-configured.
+FROM localhost/nemoclaw-hermes:kubevirt AS nemoclaw
+
+## Stage 2: supervisor binary source for COPY --from
+FROM ${OPENSHELL_SUPERVISOR_IMAGE} AS openshell-supervisor
+
+## Stage 3: bootc VM image
+FROM quay.io/fedora/fedora-bootc:44
+
+# ── OpenShell sandbox supervisor (from supervisor container image) ────
+COPY --from=openshell-supervisor /openshell-sandbox /opt/openshell/bin/openshell-sandbox
+RUN chmod 755 /opt/openshell/bin/openshell-sandbox && \
+    ln -s /opt/openshell/bin/openshell-sandbox /openshell-sandbox && \
+    mkdir -p /etc/openshell /etc/openshell-tls/client /sandbox /opt/data
+
+# ── System users ──────────────────────────────────────────────────────
+RUN groupadd -g 10001 sandbox || true && \
+    useradd -u 10001 -g 10001 -m -d /sandbox -s /bin/bash sandbox || true && \
+    groupadd -g 10002 gateway || true && \
+    useradd -u 10002 -g 10002 -s /usr/sbin/nologin gateway || true && \
+    usermod -aG sandbox gateway
+
+# ── SSH + qemu-guest-agent (day-2 root via KubeVirt accessCredentials) ─
+# Metadata arrives via virtio disks, not cloud-init. Guest agent is required
+# for virtctl credentials add-ssh-key / dynamic authorized_keys for root.
+RUN dnf install -y openssh-server openssh-clients cloud-utils-growpart \
+      qemu-guest-agent && \
+    ssh-keygen -A && \
+    echo 'sandbox:sandbox' | chpasswd && \
+    printf '%s\n' \
+      'PasswordAuthentication yes' \
+      'PermitRootLogin prohibit-password' \
+      'PubkeyAuthentication yes' \
+      > /etc/ssh/sshd_config.d/90-sandbox.conf && \
+    systemctl enable sshd qemu-guest-agent && \
+    systemctl mask cloud-init-local.service cloud-init-main.service \
+      cloud-config.service cloud-final.service 2>/dev/null || true && \
+    (command -v setsebool >/dev/null && setsebool -P virt_qemu_ga_manage_ssh on || true)
+
+# ── Core system tools (Hermes runtime only — no rust / build toolchain) ─
+RUN dnf install -y \
+      git wget \
+      python3.13 python3.13-devel \
+      nodejs npm pandoc && \
+    python3.13 -m ensurepip && \
+    dnf clean all
+
+# ── NemoClaw / Hermes application (from kubevirt-sidecar image) ───────
+COPY --from=nemoclaw /opt/hermes /opt/hermes
+COPY --from=nemoclaw /opt/nemoclaw-blueprint /opt/nemoclaw-blueprint
+COPY --from=nemoclaw /usr/local/bin/nemoclaw-start /usr/local/bin/nemoclaw-start
+COPY --from=nemoclaw /usr/local/bin/nemoclaw-start-vm /usr/local/bin/nemoclaw-start-vm
+COPY --from=nemoclaw /usr/local/bin/nemoclaw-gateway-control /usr/local/bin/nemoclaw-gateway-control
+COPY --from=nemoclaw /usr/local/lib/nemoclaw /usr/local/lib/nemoclaw
+COPY --from=nemoclaw /usr/local/bin/gosu /usr/local/bin/gosu
+COPY --from=nemoclaw /sandbox/.hermes /sandbox/.hermes
+
+# Fix venv python symlinks to point at Fedora's python3.13
+RUN ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python && \
+    ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python3 && \
+    ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python3.13 && \
+    chmod 755 /usr/local/bin/nemoclaw-start /usr/local/bin/nemoclaw-start-vm \
+      /usr/local/bin/nemoclaw-gateway-control
+
+# ── Hermes-specific packages (ddgs only) ──────────────────────────────
+RUN python3.13 -m pip install --target=/opt/hermes/.venv/lib/python3.13/site-packages ddgs
+
+COPY extra-ca-certs.pem /tmp/extra-ca-certs.pem
+RUN cat /tmp/extra-ca-certs.pem >> /etc/pki/tls/certs/ca-bundle.crt && \
+    rm /tmp/extra-ca-certs.pem
+
+# ── Hermes config (agent-sandbox VM; messaging platforms disabled) ─────
+COPY SOUL.md /sandbox/.hermes/SOUL.md
+COPY hermes.env /tmp/hermes.env
+COPY hermes-config.py /tmp/hermes-config.py
+COPY update-config-hashes.py /tmp/update-config-hashes.py
+RUN dnf install -y python3-pyyaml && dnf clean all && \
+    python3 /tmp/hermes-config.py && \
+    cat /tmp/hermes.env >> /sandbox/.hermes/.env && \
+    mkdir -p /etc/nemoclaw && \
+    python3 /tmp/update-config-hashes.py && \
+    rm -f /tmp/hermes.env /tmp/hermes-config.py /tmp/update-config-hashes.py
+
+# ── NemoClaw posture (baked at build time) ────────────────────────────
+# /sandbox + .hermes = root:sandbox 1775; config/SOUL = root:root 444;
+# .config-hash + .env = sandbox:sandbox 640. Hashes also under /etc/nemoclaw/.
+RUN mkdir -p /etc/nemoclaw /run/nemoclaw && \
+    chown root:sandbox /sandbox && chmod 1775 /sandbox && \
+    chown root:sandbox /sandbox/.hermes && chmod 1775 /sandbox/.hermes && \
+    chown root:root /sandbox/.hermes/config.yaml && chmod 444 /sandbox/.hermes/config.yaml && \
+    chown sandbox:sandbox /sandbox/.hermes/.config-hash && chmod 640 /sandbox/.hermes/.config-hash && \
+    chown sandbox:sandbox /sandbox/.hermes/.env && chmod 640 /sandbox/.hermes/.env && \
+    chown root:root /sandbox/.hermes/SOUL.md && chmod 444 /sandbox/.hermes/SOUL.md && \
+    cp /sandbox/.hermes/.config-hash /etc/nemoclaw/hermes.config-hash && \
+    chown root:root /etc/nemoclaw/hermes.config-hash && chmod 444 /etc/nemoclaw/hermes.config-hash
+
+# ── Guest bootstrap (image-owned; mounts virtio-sandboxmeta + volumes.json disks) ─
+RUN mkdir -p /usr/local/lib/openshell /etc/sandbox /etc/sysctl.d
+COPY prepare-sandbox-volumes.sh /usr/local/lib/openshell/prepare-sandbox-volumes.sh
+COPY openshell-sandbox-prep-env.sh /usr/local/lib/openshell/openshell-sandbox-prep-env.sh
+COPY openshell-sandbox-run.sh /usr/local/lib/openshell/openshell-sandbox-run.sh
+COPY sandbox-volumes.service /etc/systemd/system/sandbox-volumes.service
+COPY openshell-sandbox.service /etc/systemd/system/openshell-sandbox.service
+COPY 99-openshell-quiet-console.conf /etc/sysctl.d/99-openshell-quiet-console.conf
+RUN chmod 755 /usr/local/lib/openshell/prepare-sandbox-volumes.sh \
+      /usr/local/lib/openshell/openshell-sandbox-prep-env.sh \
+      /usr/local/lib/openshell/openshell-sandbox-run.sh && \
+    systemctl enable sandbox-volumes.service openshell-sandbox.service
+# /etc/sandbox/{env,volumes.json} come from the sandboxmeta virtio disk at boot.

@@ -1,0 +1,14 @@
+[Unit]
+Description=OpenShell Sandbox Supervisor
+After=network-online.target sshd.service sandbox-volumes.service
+Wants=network-online.target sandbox-volumes.service
+Requires=sandbox-volumes.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/openshell/openshell-sandbox-run.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

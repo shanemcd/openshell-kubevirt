@@ -18,7 +18,7 @@ on:
         type: boolean
         default: true
       build_hermes:
-        description: Rebuild hermes-sandbox-bootc from clankr (uses existing GHCR supervisor/nemoclaw)
+        description: Rebuild hermes-sandbox-bootc from hermes/ in this repo (uses existing GHCR supervisor/nemoclaw)
         type: boolean
         default: false
 
@@ -408,10 +408,6 @@ jobs:
 
       - uses: actions/checkout@v4
         if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes == 'true'
-        with:
-          repository: ${{ github.repository_owner }}/clankr
-          ref: main
-          path: clankr
 
       - uses: docker/setup-buildx-action@v3
         if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes == 'true'
@@ -429,8 +425,8 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          SHORT=$(git -C clankr rev-parse --short HEAD)
-          CTX=clankr/agents/hermes/openshell
+          SHORT=$(git rev-parse --short HEAD)
+          CTX=hermes
           cd "$CTX"
 
           # Gitignored locally; CI uses the example + empty CA bundle.

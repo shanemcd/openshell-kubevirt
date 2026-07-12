@@ -1,0 +1,7 @@
+# Site-specific files (copy from .example templates)
+hermes.env
+extra-ca-certs.pem
+
+# Supervisor comes from an OpenShell supervisor *image* via COPY --from
+# (see Containerfile.kubevirt). Do not stage a raw binary here.
+openshell-sandbox

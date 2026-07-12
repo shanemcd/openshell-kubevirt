@@ -2,13 +2,14 @@
 
 Tracking and iteration repo for running **OpenShell + Hermes (NemoClaw)** on **KubeVirt** via **agent-sandbox** `runtimeBackend: VirtualMachine`.
 
-This is intentionally a thin meta-repo: forks and product code stay in their upstreams; handoff notes, runbooks, and experiments live here.
+Forks and product code stay in their upstreams; handoff notes, runbooks, and the **Hermes bootc / KubeVirt guest image** (`hermes/`) live here.
 
 ## Start here
 
 - **[`AGENT-SANDBOX-VM.md`](./AGENT-SANDBOX-VM.md)** — piece-by-piece demo of the agent-sandbox `VirtualMachine` backend only (metadata, PVCs, Secret disks, RBAC).
-- **[`VM-HERMES-BLOCKER.md`](./VM-HERMES-BLOCKER.md)** — living CRC handoff for the full Hermes / OpenShell stack (branches, redeploy gotchas, next actions).
+- **[`TRACKING.md`](./TRACKING.md)** — living CRC handoff for the full Hermes / OpenShell stack (branches, redeploy gotchas, next actions).
 - **[`REDEPLOY.md`](./REDEPLOY.md)** — pin CRC controller/gateway (and Hermes containerDisk) from nightly GHCR.
+- **[`hermes/`](./hermes/)** — `Containerfile.kubevirt` + guest bootstrap sources for the Hermes bootc / containerDisk images.
 
 ## Related repos
 
@@ -17,7 +18,7 @@ This is intentionally a thin meta-repo: forks and product code stay in their ups
 | [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) → [shanemcd/agent-sandbox](https://github.com/shanemcd/agent-sandbox) | `kubevirt-backend` |
 | [NVIDIA/OpenShell](https://github.com/NVIDIA/OpenShell) → [shanemcd/OpenShell](https://github.com/shanemcd/OpenShell) | `kubevirt-sidecar` |
 | [NVIDIA/NemoClaw](https://github.com/NVIDIA/NemoClaw) → [shanemcd/NemoClaw](https://github.com/shanemcd/NemoClaw) | `kubevirt-sidecar` |
-| [shanemcd/clankr](https://github.com/shanemcd/clankr) (Hermes bootc image) | `main` |
+| [shanemcd/clankr](https://github.com/shanemcd/clankr) (pod Hermes image; bootc moved here) | `main` |
 
 ## Nightly CI
 
@@ -55,7 +56,7 @@ gh secret set APP_PRIVATE_KEY --repo shanemcd/openshell-kubevirt < /path/to/app.
 | `ghcr.io/shanemcd/openshell-gateway` | OpenShell `kubevirt-sidecar` |
 | `ghcr.io/shanemcd/openshell-supervisor` | OpenShell `kubevirt-sidecar` |
 | `ghcr.io/shanemcd/nemoclaw-hermes` | NemoClaw `kubevirt-sidecar` |
-| `ghcr.io/shanemcd/hermes-sandbox-bootc` | clankr `main` |
+| `ghcr.io/shanemcd/hermes-sandbox-bootc` | this repo [`hermes/`](./hermes/) |
 | `ghcr.io/shanemcd/hermes-sandbox-kubevirt` | bootc → qcow2 containerDisk (`/disk/fedora.qcow2`) |
 
 Tags: `nightly`, `YYYYMMDD`, `sha-<short>` (plus `kubevirt` on nemoclaw-hermes / openshell-supervisor).

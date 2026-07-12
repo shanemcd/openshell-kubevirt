@@ -44,7 +44,7 @@ Local clones (paths are machine-local; remotes matter more than layout):
 | `/etc/sandbox/volumes.json` | PVC entries `{name,serial,mountPath,source:persistentVolumeClaim,claimName}` + Secret disks `{…,source:secret,secretName}`. **Metadata disk itself is not listed.** |
 | Secret `volumeMount`s (first container) | Extra Secret virtio disks (serial = sanitized volume name); guest mounts via `/dev/disk/by-id/virtio-*` and copies TLS → `/etc/openshell-tls/client` |
 
-Bootc image (`Containerfile.kubevirt`) owns: `sandbox-volumes.service` (after `local-fs`, **not** `cloud-final`), `openshell-sandbox.service`, `prepare-sandbox-volumes.sh`, `openshell-sandbox-prep-env.sh`, qemu-guest-agent, Hermes seals, supervisor binary. Cloud-init is masked in the image.
+Bootc image ([`hermes/Containerfile.kubevirt`](./hermes/Containerfile.kubevirt)) owns: `sandbox-volumes.service` (after `local-fs`, **not** `cloud-final`), `openshell-sandbox.service`, `prepare-sandbox-volumes.sh`, `openshell-sandbox-prep-env.sh`, qemu-guest-agent, Hermes seals, supervisor binary. Cloud-init is masked in the image.
 
 ### What works on CRC right now
 
@@ -157,7 +157,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 | `kubernetes-sigs/agent-sandbox` | [`kubevirt-backend`](https://github.com/shanemcd/agent-sandbox/tree/kubevirt-backend) | [compare](https://github.com/kubernetes-sigs/agent-sandbox/compare/main...shanemcd:agent-sandbox:kubevirt-backend) | `runtimeBackend: VirtualMachine`, virtio Secret metadata (`sandboxmeta` + Secret disks; no cloud-init), VCT→virtio PVC disks, optional kubevirt RBAC |
 | `NVIDIA/OpenShell` | [`kubevirt-sidecar`](https://github.com/shanemcd/OpenShell/tree/kubevirt-sidecar) | [compare](https://github.com/NVIDIA/OpenShell/compare/main...shanemcd:OpenShell:kubevirt-sidecar) | Sidecar runtime, preserve-ownership, k8s `runtimeBackend` / `sandboxCommand`, `workspace_persistence`, VM TLS volume/env (pod parity) |
 | `NVIDIA/NemoClaw` | [`kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar) | [compare](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:kubevirt-sidecar) | OpenShell-supervised identity (sibling **or parent**) + `nemoclaw-start-vm` (`NEMOCLAW_VM_SIDECAR=1`) |
-| `shanemcd/clankr` | [`main`](https://github.com/shanemcd/clankr) | — | Lean `Containerfile.kubevirt` (Hermes+ddgs), guest systemd/prep scripts, Slack-only config; Quay disk `quay.io/shanemcd/hermes-sandbox-kubevirt` |
+| `shanemcd/clankr` | [`main`](https://github.com/shanemcd/clankr) | — | Pod Hermes image; **bootc guest sources moved to** [`openshell-kubevirt/hermes`](./hermes/) |
 | `shanemcd/openshell-kubevirt` | [`main`](https://github.com/shanemcd/openshell-kubevirt) | — | Living handoff + iteration notes for this project |
 
 ## Bake outcomes (2026-07-10 evening → 2026-07-11 night)
@@ -461,9 +461,9 @@ CRDs regenerated with `make fix-go-generate` (conversion webhook via `sort-crd-v
 
 ### `shanemcd/clankr` (`main`)
 
-**`Containerfile.kubevirt`:** `FROM localhost/nemoclaw-hermes:kubevirt` (built via `build-nemoclaw-hermes-kubevirt.sh`); `COPY --from` an OpenShell **supervisor image** (`/openshell-sandbox`); Hermes + **ddgs only**; Slack-only overlay; no rust/CLIs/patches / no checked-in supervisor binary; cloud-init masked; qemu-guest-agent enabled; `PermitRootLogin prohibit-password` (console password for `sandbox` user retained).
+**[`hermes/Containerfile.kubevirt`](./hermes/Containerfile.kubevirt):** `FROM localhost/nemoclaw-hermes:kubevirt`; `COPY --from` an OpenShell **supervisor image** (`/openshell-sandbox`); Hermes + **ddgs only**; messaging platforms disabled; no rust/CLIs/patches / no checked-in supervisor binary; cloud-init masked; qemu-guest-agent enabled; `PermitRootLogin prohibit-password` (console password for `sandbox` user retained).
 **Guest bootstrap (image-owned):** `sandbox-volumes.service` + `openshell-sandbox.service` consume virtio `sandboxmeta` + Secret/PVC disks (`prepare-sandbox-volumes.sh`). Stage iso under `/run/sandbox-disks` before copying to `/etc/sandbox` (SELinux). The controller does not write OpenShell systemd units or prepare scripts.
-**Slack-focused config:** `hermes-config.py`, `hermes.env` / `.example`, `policy.yaml` / `.example`, `SOUL.md`, `PROVIDERS.md`.
+**Config bake:** `hermes-config.py`, `hermes.env.example`, `SOUL.md` (agent-sandbox / OpenShell inference only).
 
 ## CRC deployment state
 
