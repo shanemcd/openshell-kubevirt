@@ -1,0 +1,419 @@
+name: Nightly rebase and rebuild
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      rebase:
+        description: Rebase forks onto upstream and force-push when clean
+        type: boolean
+        default: true
+      push_images:
+        description: Build and push images to GHCR
+        type: boolean
+        default: true
+
+concurrency:
+  group: nightly-rebuild
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      date: ${{ steps.meta.outputs.date }}
+      rebase: ${{ steps.meta.outputs.rebase }}
+      push_images: ${{ steps.meta.outputs.push_images }}
+    steps:
+      - id: meta
+        run: |
+          set -euo pipefail
+          echo "date=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "rebase=${{ inputs.rebase }}" >> "$GITHUB_OUTPUT"
+            echo "push_images=${{ inputs.push_images }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "rebase=true" >> "$GITHUB_OUTPUT"
+            echo "push_images=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  rebase-agent-sandbox:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.rebase.outputs.sha }}
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: agent-sandbox
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/agent-sandbox
+          ref: kubevirt-backend
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+          path: src
+
+      - id: rebase
+        working-directory: src
+        env:
+          SHOULD_REBASE: ${{ needs.meta.outputs.rebase }}
+        run: |
+          set -euo pipefail
+          git config user.name "openshell-kubevirt-rebase[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/kubernetes-sigs/agent-sandbox.git
+          git fetch upstream main
+          if [[ "$SHOULD_REBASE" == "true" ]]; then
+            if ! git rebase upstream/main; then
+              echo "::error::Rebase conflict on agent-sandbox kubevirt-backend"
+              git status
+              git rebase --abort || true
+              exit 1
+            fi
+            git push --force-with-lease origin kubevirt-backend
+          else
+            echo "Skipping rebase/push (rebase=false)"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+  rebase-openshell:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.rebase.outputs.sha }}
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: OpenShell
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/OpenShell
+          ref: kubevirt-sidecar
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+          path: src
+
+      - id: rebase
+        working-directory: src
+        env:
+          SHOULD_REBASE: ${{ needs.meta.outputs.rebase }}
+        run: |
+          set -euo pipefail
+          git config user.name "openshell-kubevirt-rebase[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/NVIDIA/OpenShell.git
+          git fetch upstream main
+          if [[ "$SHOULD_REBASE" == "true" ]]; then
+            if ! git rebase upstream/main; then
+              echo "::error::Rebase conflict on OpenShell kubevirt-sidecar"
+              git status
+              git rebase --abort || true
+              exit 1
+            fi
+            git push --force-with-lease origin kubevirt-sidecar
+          else
+            echo "Skipping rebase/push (rebase=false)"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  rebase-nemoclaw:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.rebase.outputs.sha }}
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: NemoClaw
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/NemoClaw
+          ref: kubevirt-sidecar
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+          path: src
+
+      - id: rebase
+        working-directory: src
+        env:
+          SHOULD_REBASE: ${{ needs.meta.outputs.rebase }}
+        run: |
+          set -euo pipefail
+          git config user.name "openshell-kubevirt-rebase[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/NVIDIA/NemoClaw.git
+          git fetch upstream main
+          if [[ "$SHOULD_REBASE" == "true" ]]; then
+            if ! git rebase upstream/main; then
+              echo "::error::Rebase conflict on NemoClaw kubevirt-sidecar"
+              git status
+              git rebase --abort || true
+              exit 1
+            fi
+            git push --force-with-lease origin kubevirt-sidecar
+          else
+            echo "Skipping rebase/push (rebase=false)"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-agent-sandbox:
+    needs: [meta, rebase-agent-sandbox]
+    if: needs.meta.outputs.push_images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/agent-sandbox
+          ref: ${{ needs.rebase-agent-sandbox.outputs.sha }}
+          path: src
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push controller
+        working-directory: src
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+          SHA: ${{ needs.rebase-agent-sandbox.outputs.sha }}
+        run: |
+          set -euo pipefail
+          SHORT="${SHA:0:7}"
+          IMAGE="${REGISTRY}/agent-sandbox-controller"
+          GIT_VERSION=$(git describe --always --dirty 2>/dev/null || echo "$SHORT")
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            -t "${IMAGE}:nightly" \
+            -t "${IMAGE}:${DATE}" \
+            -t "${IMAGE}:sha-${SHORT}" \
+            --build-arg "GIT_VERSION=${GIT_VERSION}" \
+            --build-arg "GIT_SHA=${SHORT}" \
+            --build-arg "BUILD_DATE=${BUILD_DATE}" \
+            -f Dockerfile \
+            .
+
+  build-openshell-gateway:
+    needs: [meta, rebase-openshell]
+    if: needs.meta.outputs.push_images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/OpenShell
+          ref: ${{ needs.rebase-openshell.outputs.sha }}
+          path: src
+          fetch-depth: 0
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: jdx/mise-action@v2
+        with:
+          working_directory: src
+
+      - name: Stage gateway binary and push image
+        working-directory: src
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+          SHA: ${{ needs.rebase-openshell.outputs.sha }}
+          DOCKER_PLATFORM: linux/amd64
+          MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHORT="${SHA:0:7}"
+          TAG="sha-${SHORT}"
+          mise install --locked
+          DOCKER_PLATFORM=linux/amd64 tasks/scripts/stage-prebuilt-binaries.sh gateway
+          # Script maps IMAGE_REGISTRY + openshell/gateway → ${REGISTRY}/gateway
+          IMAGE_REGISTRY="${REGISTRY}" \
+          IMAGE_TAG="${TAG}" \
+          DOCKER_PLATFORM=linux/amd64 \
+          DOCKER_PUSH=1 \
+          CI=1 \
+            tasks/scripts/docker-build-image.sh gateway
+          SRC="${REGISTRY}/gateway:${TAG}"
+          for t in nightly "${DATE}" "${TAG}"; do
+            docker buildx imagetools create \
+              -t "${REGISTRY}/openshell-gateway:${t}" \
+              "$SRC"
+          done
+
+  build-openshell-supervisor:
+    needs: [meta, rebase-openshell]
+    if: needs.meta.outputs.push_images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/OpenShell
+          ref: ${{ needs.rebase-openshell.outputs.sha }}
+          path: src
+          fetch-depth: 0
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: jdx/mise-action@v2
+        with:
+          working_directory: src
+
+      - name: Stage supervisor binary and push image
+        working-directory: src
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+          SHA: ${{ needs.rebase-openshell.outputs.sha }}
+          DOCKER_PLATFORM: linux/amd64
+          MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHORT="${SHA:0:7}"
+          TAG="sha-${SHORT}"
+          mise install --locked
+          DOCKER_PLATFORM=linux/amd64 tasks/scripts/stage-prebuilt-binaries.sh supervisor
+          IMAGE_REGISTRY="${REGISTRY}" \
+          IMAGE_TAG="${TAG}" \
+          DOCKER_PLATFORM=linux/amd64 \
+          DOCKER_PUSH=1 \
+          CI=1 \
+            tasks/scripts/docker-build-image.sh supervisor
+          SRC="${REGISTRY}/supervisor:${TAG}"
+          for t in nightly "${DATE}" "${TAG}" kubevirt; do
+            docker buildx imagetools create \
+              -t "${REGISTRY}/openshell-supervisor:${t}" \
+              "$SRC"
+          done
+
+  build-nemoclaw-hermes:
+    needs: [meta, rebase-nemoclaw]
+    if: needs.meta.outputs.push_images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/NemoClaw
+          ref: ${{ needs.rebase-nemoclaw.outputs.sha }}
+          path: src
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push nemoclaw-hermes
+        working-directory: src
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+          SHA: ${{ needs.rebase-nemoclaw.outputs.sha }}
+        run: |
+          set -euo pipefail
+          SHORT="${SHA:0:7}"
+          IMAGE="${REGISTRY}/nemoclaw-hermes"
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            --build-arg BASE_IMAGE=ghcr.io/nvidia/nemoclaw/hermes-sandbox-base:latest \
+            -t "${IMAGE}:nightly" \
+            -t "${IMAGE}:${DATE}" \
+            -t "${IMAGE}:sha-${SHORT}" \
+            -t "${IMAGE}:kubevirt" \
+            -f agents/hermes/Dockerfile \
+            .
+
+  build-hermes-bootc:
+    needs: [meta, build-openshell-supervisor, build-nemoclaw-hermes]
+    if: needs.meta.outputs.push_images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/clankr
+          ref: main
+          path: clankr
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare context and build hermes-sandbox-bootc
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          SHORT=$(git -C clankr rev-parse --short HEAD)
+          CTX=clankr/agents/hermes/openshell
+          cd "$CTX"
+
+          # Gitignored locally; CI uses the example + empty CA bundle.
+          cp -f hermes.env.example hermes.env
+          : > extra-ca-certs.pem
+
+          # Containerfile hardcodes localhost for nemoclaw; rewrite for GHCR/buildx.
+          sed -i "s|FROM localhost/nemoclaw-hermes:kubevirt|FROM ${REGISTRY}/nemoclaw-hermes:nightly|" \
+            Containerfile.kubevirt
+
+          IMAGE="${REGISTRY}/hermes-sandbox-bootc"
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            --build-arg "OPENSHELL_SUPERVISOR_IMAGE=${REGISTRY}/openshell-supervisor:nightly" \
+            -t "${IMAGE}:nightly" \
+            -t "${IMAGE}:${DATE}" \
+            -t "${IMAGE}:sha-${SHORT}" \
+            -f Containerfile.kubevirt \
+            .
