@@ -1,0 +1,137 @@
+# signal-cli on CRC
+#
+# In-cluster HTTP daemon for Hermes Signal. Guest reaches it at:
+#   http://signal-cli.default.svc.cluster.local:8080
+#
+# Link once (QR), then start the daemon. See README.md.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: signal-cli-data
+  namespace: default
+  labels:
+    app.kubernetes.io/name: signal-cli
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+  # CRC default; WaitForFirstConsumer — binds when the link/daemon pod starts
+  storageClassName: crc-csi-hostpath-provisioner
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: signal-cli
+  namespace: default
+  labels:
+    app.kubernetes.io/name: signal-cli
+spec:
+  selector:
+    app.kubernetes.io/name: signal-cli
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signal-cli
+  namespace: default
+  labels:
+    app.kubernetes.io/name: signal-cli
+spec:
+  replicas: 0 # start at 0 until linked; link.sh scales to 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: signal-cli
+  strategy:
+    type: Recreate # single RWO PVC
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: signal-cli
+    spec:
+      # Image USER is signal-cli (101). Hostpath PVC is root-owned until chown.
+      securityContext:
+        fsGroup: 101
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        - name: fix-data-perms
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["sh", "-c", "mkdir -p /var/lib/signal-cli && chown -R 101:101 /var/lib/signal-cli"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/signal-cli
+      containers:
+        - name: signal-cli
+          image: registry.gitlab.com/packaging/signal-cli/signal-cli-native:latest
+          imagePullPolicy: IfNotPresent
+          # Explicit data dir (do not rely on HOME/.local/share).
+          args: ["-d", "/var/lib/signal-cli", "daemon", "--http", "0.0.0.0:8080"]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /api/v1/check
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/check
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/signal-cli
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: signal-cli-data
+        - name: tmp
+          emptyDir:
+            medium: Memory
+      serviceAccountName: signal-cli
+---
+# Allow initContainer chown (runAsUser 0) on CRC/OpenShift.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: signal-cli
+  namespace: default
+  labels:
+    app.kubernetes.io/name: signal-cli
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: signal-cli-anyuid
+  namespace: default
+  labels:
+    app.kubernetes.io/name: signal-cli
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: signal-cli
+    namespace: default

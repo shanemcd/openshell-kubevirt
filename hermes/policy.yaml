@@ -89,3 +89,14 @@ network_policies:
         access: full
     binaries:
       - path: /opt/hermes/.venv/bin/python
+
+  signal:
+    name: signal
+    endpoints:
+      - host: signal-cli.default.svc.cluster.local
+        port: 8080
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /opt/hermes/.venv/bin/python
