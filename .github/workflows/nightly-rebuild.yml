@@ -498,9 +498,11 @@ jobs:
           test -n "$QCOW2"
           test -f "$QCOW2"
 
+          # buildx --format '{{.Digest}}' is unreliable across versions; parse text output.
           DIGEST=$(docker buildx imagetools inspect \
             "${REGISTRY}/hermes-sandbox-bootc:nightly" \
-            --format '{{.Digest}}')
+            | awk '/^Digest:/ { print $2; exit }')
+          test -n "$DIGEST"
           SHORT="${DIGEST#sha256:}"
           SHORT="${SHORT:0:12}"
 
