@@ -19,7 +19,7 @@ Forks and product code stay in their upstreams; handoff notes, runbooks, and the
 | Repo | Fork branch |
 |------|-------------|
 | [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) → [shanemcd/agent-sandbox](https://github.com/shanemcd/agent-sandbox) | `kubevirt-backend` |
-| [NVIDIA/OpenShell](https://github.com/NVIDIA/OpenShell) → [shanemcd/OpenShell](https://github.com/shanemcd/OpenShell) | `kubevirt-sidecar` |
+| [NVIDIA/OpenShell](https://github.com/NVIDIA/OpenShell) → [shanemcd/OpenShell](https://github.com/shanemcd/OpenShell) | `vm-runtime-backend` |
 | [NVIDIA/NemoClaw](https://github.com/NVIDIA/NemoClaw) → [shanemcd/NemoClaw](https://github.com/shanemcd/NemoClaw) | `kubevirt-sidecar` |
 | [shanemcd/clankr](https://github.com/shanemcd/clankr) (pod Hermes image; bootc moved here) | `main` |
 
@@ -56,8 +56,8 @@ gh secret set APP_PRIVATE_KEY --repo shanemcd/openshell-kubevirt < /path/to/app.
 | Image | Source |
 |-------|--------|
 | `ghcr.io/shanemcd/agent-sandbox-controller` | agent-sandbox `kubevirt-backend` |
-| `ghcr.io/shanemcd/openshell-gateway` | OpenShell `kubevirt-sidecar` |
-| `ghcr.io/shanemcd/openshell-supervisor` | OpenShell `kubevirt-sidecar` |
+| `ghcr.io/shanemcd/openshell-gateway` | OpenShell `vm-runtime-backend` |
+| `ghcr.io/shanemcd/openshell-supervisor` | OpenShell `vm-runtime-backend` |
 | `ghcr.io/shanemcd/nemoclaw-hermes` | NemoClaw `kubevirt-sidecar` |
 | `ghcr.io/shanemcd/hermes-sandbox-bootc` | this repo [`hermes/`](./hermes/) |
 | `ghcr.io/shanemcd/hermes-sandbox-kubevirt` | bootc → qcow2 containerDisk (`/disk/fedora.qcow2`) |
