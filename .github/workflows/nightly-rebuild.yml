@@ -17,6 +17,10 @@ on:
         description: Convert hermes-sandbox-bootc to hermes-sandbox-kubevirt containerDisk
         type: boolean
         default: true
+      build_hermes:
+        description: Rebuild hermes-sandbox-bootc from clankr (uses existing GHCR supervisor/nemoclaw)
+        type: boolean
+        default: false
 
 concurrency:
   group: nightly-rebuild
@@ -37,6 +41,7 @@ jobs:
       rebase: ${{ steps.meta.outputs.rebase }}
       push_images: ${{ steps.meta.outputs.push_images }}
       build_container_disk: ${{ steps.meta.outputs.build_container_disk }}
+      build_hermes: ${{ steps.meta.outputs.build_hermes }}
     steps:
       - id: meta
         run: |
@@ -46,10 +51,12 @@ jobs:
             echo "rebase=${{ inputs.rebase }}" >> "$GITHUB_OUTPUT"
             echo "push_images=${{ inputs.push_images }}" >> "$GITHUB_OUTPUT"
             echo "build_container_disk=${{ inputs.build_container_disk }}" >> "$GITHUB_OUTPUT"
+            echo "build_hermes=${{ inputs.build_hermes }}" >> "$GITHUB_OUTPUT"
           else
             echo "rebase=true" >> "$GITHUB_OUTPUT"
             echo "push_images=true" >> "$GITHUB_OUTPUT"
             echo "build_container_disk=true" >> "$GITHUB_OUTPUT"
+            echo "build_hermes=false" >> "$GITHUB_OUTPUT"
           fi
 
   rebase-agent-sandbox:
@@ -379,45 +386,45 @@ jobs:
 
   build-hermes-bootc:
     needs: [meta, build-openshell-supervisor, build-nemoclaw-hermes]
-    # always() so this job is not cascade-skipped when push_images=false (deps skipped).
-    # No-op success in that case so containerDisk can depend on a real success result.
+    # Rebuild when push_images (after deps) or when build_hermes alone (reuse GHCR :nightly deps).
     if: |
       always() &&
       !cancelled() &&
       needs.meta.result == 'success' &&
       (
-        needs.meta.outputs.push_images != 'true' ||
-        (
-          needs.build-openshell-supervisor.result == 'success' &&
-          needs.build-nemoclaw-hermes.result == 'success'
-        )
+        needs.meta.outputs.build_hermes == 'true' ||
+        needs.meta.outputs.push_images == 'true' &&
+        needs.build-openshell-supervisor.result == 'success' &&
+        needs.build-nemoclaw-hermes.result == 'success' ||
+        needs.meta.outputs.push_images != 'true' &&
+        needs.meta.outputs.build_hermes != 'true'
       )
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Use existing hermes-sandbox-bootc:nightly
-        if: needs.meta.outputs.push_images != 'true'
+        if: needs.meta.outputs.push_images != 'true' && needs.meta.outputs.build_hermes != 'true'
         run: echo "Skipping bootc rebuild; containerDisk will pull existing :nightly"
 
       - uses: actions/checkout@v4
-        if: needs.meta.outputs.push_images == 'true'
+        if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes == 'true'
         with:
           repository: ${{ github.repository_owner }}/clankr
           ref: main
           path: clankr
 
       - uses: docker/setup-buildx-action@v3
-        if: needs.meta.outputs.push_images == 'true'
+        if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes == 'true'
 
       - uses: docker/login-action@v3
-        if: needs.meta.outputs.push_images == 'true'
+        if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare context and build hermes-sandbox-bootc
-        if: needs.meta.outputs.push_images == 'true'
+        if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes == 'true'
         env:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
