@@ -42,8 +42,13 @@ if [ -n "${OPENSHELL_SANDBOX_COMMAND:-}" ]; then
   echo "OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1" >>"$DROPIN_ENV"
 fi
 
-# Prefer token file over putting the JWT on the process environment long-term.
-if [ -n "${OPENSHELL_SANDBOX_TOKEN:-}" ]; then
+# Prefer K8s SA bootstrap (rebootstrap-capable) over a static gateway JWT.
+# A static OPENSHELL_SANDBOX_TOKEN / TOKEN_FILE wins in the supervisor and
+# cannot rebootstrap after reboot once the JWT expires — only use it when
+# no SA token path is configured.
+if [ -n "${OPENSHELL_K8S_SA_TOKEN_FILE:-}" ]; then
+  echo "OPENSHELL_K8S_SA_TOKEN_FILE=${OPENSHELL_K8S_SA_TOKEN_FILE}" >>"$DROPIN_ENV"
+elif [ -n "${OPENSHELL_SANDBOX_TOKEN:-}" ]; then
   umask 077
   printf '%s' "$OPENSHELL_SANDBOX_TOKEN" >"$TOKEN_PATH"
   chmod 0400 "$TOKEN_PATH"
@@ -89,7 +94,7 @@ if [ -f "$ENV_FILE" ]; then
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       ''|\#*) continue ;;
-      OPENSHELL_SANDBOX_TOKEN=*|OPENSHELL_TLS_CA_PEM=*|OPENSHELL_TLS_CERT_PEM=*|OPENSHELL_TLS_KEY_PEM=*|OPENSHELL_TLS_CA_B64=*|OPENSHELL_TLS_CERT_B64=*|OPENSHELL_TLS_KEY_B64=*|SANDBOX_TLS_CA_PEM=*|SANDBOX_TLS_CERT_PEM=*|SANDBOX_TLS_KEY_PEM=*|SANDBOX_TLS_CA_B64=*|SANDBOX_TLS_CERT_B64=*|SANDBOX_TLS_KEY_B64=*) continue ;;
+      OPENSHELL_SANDBOX_TOKEN=*|OPENSHELL_K8S_SA_TOKEN_FILE=*|OPENSHELL_TLS_CA_PEM=*|OPENSHELL_TLS_CERT_PEM=*|OPENSHELL_TLS_KEY_PEM=*|OPENSHELL_TLS_CA_B64=*|OPENSHELL_TLS_CERT_B64=*|OPENSHELL_TLS_KEY_B64=*|SANDBOX_TLS_CA_PEM=*|SANDBOX_TLS_CERT_PEM=*|SANDBOX_TLS_KEY_PEM=*|SANDBOX_TLS_CA_B64=*|SANDBOX_TLS_CERT_B64=*|SANDBOX_TLS_KEY_B64=*) continue ;;
       *=*)
         key="${line%%=*}"
         case "$key" in

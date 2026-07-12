@@ -10,6 +10,7 @@ Forks and product code stay in their upstreams; handoff notes, runbooks, and the
 - **[`TRACKING.md`](./TRACKING.md)** — living CRC handoff for the full Hermes / OpenShell stack (branches, redeploy gotchas, next actions).
 - **[`REDEPLOY.md`](./REDEPLOY.md)** — pin CRC controller/gateway (and Hermes containerDisk) from nightly GHCR.
 - **[`hermes/`](./hermes/)** — `Containerfile.kubevirt` + guest bootstrap sources for the Hermes bootc / containerDisk images.
+- **[`hermes/OPENSHELL-POLICY.md`](./hermes/OPENSHELL-POLICY.md)** — Hermes instructions: view/diagnose/update OpenShell policy entries.
 - **[`signal/`](./signal/)** — in-cluster signal-cli for Hermes (`./signal/link.sh`).
 - **[`kube-proxy/`](./kube-proxy/)** — cluster-admin `oc` for Hermes via in-cluster kubectl proxy (`./kube-proxy/setup.sh`; OpenShell blocks `:6443`).
 

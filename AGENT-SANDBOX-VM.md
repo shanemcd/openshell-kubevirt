@@ -13,12 +13,16 @@ flowchart TB
   SB[Sandbox CR]
   SB --> PVC[PVCs from volumeClaimTemplates]
   SB --> META["Secret sandbox-meta<br/>keys: env, volumes.json"]
+  SB --> BOOT["Pod {name}-openshell-bootstrap<br/>(optional OpenShell SA)"]
+  SB --> SASEC["Secret {name}-openshell-sa-token"]
   SB --> VM[KubeVirt VirtualMachine]
   SB --> SVC[Service optional]
+  BOOT --> SASEC
   META --> DISKMETA["virtio disk serial=sandboxmeta"]
   PVC --> DISKPVC["virtio disks serial=sanitized mount name"]
   SB --> SECRETS["Secret volumeMounts on containers[0]"]
   SECRETS --> DISKSEC["virtio Secret disks + volumes.json entries"]
+  SASEC --> DISKSEC
   IMAGE["containers[0].image"] --> CD["containerDisk"]
   CD --> VM
   DISKMETA --> VM
@@ -261,6 +265,21 @@ spec:
 | `volumes.json` | `source: secret`, `secretName: demo-tls`, `mountPath: /etc/tls` |
 
 **Not attached today:** ConfigMap, EmptyDir, projected volumes, mounts on containers other than `[0]`.
+
+---
+
+## Piece 5b — OpenShell SA token bootstrap (BoundObjectRef)
+
+Pod sandboxes use a kubelet-projected SA token. VMs cannot, so when the Sandbox CR requests a Secret volume named `openshell-sa-token` (secret `{sandbox}-openshell-sa-token`), the controller:
+
+1. Creates a companion Pod `{sandbox}-openshell-bootstrap` (pause image), Sandbox-owned, with `openshell.io/sandbox-id` and the same `serviceAccountName` as the template
+2. Mints a `TokenRequest` (`audience: openshell-gateway`, BoundObjectRef → bootstrap Pod)
+3. Writes the JWT into Secret `{sandbox}-openshell-sa-token` key `token`, refreshing before expiry
+4. Attaches that Secret as a virtio disk (same path as Piece 5)
+
+The guest mounts it at `/var/run/secrets/openshell/token` and calls `IssueSandboxToken` — including after reboot, when a static gateway JWT would have expired.
+
+Implementation: `controllers/vm_openshell_bootstrap.go`. Requires the kubevirt ClusterRole rules for `serviceaccounts` get + `serviceaccounts/token` create.
 
 ---
 

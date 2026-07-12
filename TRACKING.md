@@ -231,7 +231,7 @@ VM (systemd):
   openshell-sandbox.service        ← After/Requires sandbox-volumes; WantedBy=multi-user.target
     └─ openshell-sandbox-prep-env.sh → /run/openshell/supervisor.env
     └─ exec /opt/openshell/bin/openshell-sandbox   (default --mode=network,process)
-         Environment from drop-in (endpoint, JWT file, TLS paths, SANDBOX_COMMAND, PRESERVE=1)
+         Environment from drop-in (endpoint, K8S SA token path / optional JWT file, TLS paths, SANDBOX_COMMAND, PRESERVE=1)
          └─ creates netns + proxy at 10.200.0.1:3128
          └─ skips recursive /sandbox chown when PRESERVE set
          └─ forks Landlock/seccomp child as sandbox (UID 10001)
@@ -363,6 +363,16 @@ Also clear `providers` / `custom_providers` entries named `custom`. A leftover b
 | GitHub | ALLOWED | CDN hosts + github provider; install tools under `/sandbox/.hermes/bin` |
 
 ## Still open
+
+#### VM sandbox JWT rebootstrap after reboot
+
+**Fixed in forks (local, not yet redeployed on CRC):**
+
+- OpenShell `kubevirt-sidecar`: VM Sandbox CR uses `OPENSHELL_K8S_SA_TOKEN_FILE` + Secret volume `{name}-openshell-sa-token` (no static `OPENSHELL_SANDBOX_TOKEN`)
+- agent-sandbox `kubevirt-backend`: companion Pod `{name}-openshell-bootstrap` + rotating BoundObjectRef TokenRequest → that Secret
+- Hermes guest: `openshell-sandbox-prep-env.sh` prefers SA token path over static JWT file
+
+Redeploy controller + gateway, recreate Hermes (or wait for nightly), then reboot VM and confirm supervisor does not crash-loop on `ExpiredSignature`.
 
 #### Prove workspace PVC end-to-end (next)
 
