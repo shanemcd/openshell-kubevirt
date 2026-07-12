@@ -34,6 +34,32 @@ process:
   run_as_group: sandbox
 
 network_policies:
+  # OpenShell inference proxy (Vertex). Hermes dials this host; gateway rewrites.
+  inference:
+    name: inference
+    endpoints:
+      - host: inference.local
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+
+  # Auxiliary model / credit probe fallback
+  openrouter:
+    name: openrouter
+    endpoints:
+      - host: openrouter.ai
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+
   duckduckgo:
     name: duckduckgo
     endpoints:
@@ -86,6 +112,65 @@ network_policies:
       - path: /usr/local/bin/gh
       - path: /usr/bin/gh
 
+  # uv installer
+  astral:
+    name: astral
+    endpoints:
+      - host: astral.sh
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: "*.astral.sh"
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /usr/bin/curl
+      - path: /usr/bin/wget
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+
+  pypi:
+    name: pypi
+    endpoints:
+      - host: pypi.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: files.pythonhosted.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+      - path: /usr/bin/pip
+      - path: /usr/bin/pip3
+
+  # tirith / package ecosystem metadata
+  package_metadata:
+    name: package-metadata
+    endpoints:
+      - host: api.deps.dev
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: packages.ecosyste.ms
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /sandbox/.hermes/bin/tirith
+      - path: /sandbox/**/bin/tirith
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+
   slack:
     name: slack
     endpoints:
@@ -107,6 +192,7 @@ network_policies:
         access: full
     binaries:
       - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
 
   signal:
     name: signal
@@ -118,6 +204,8 @@ network_policies:
         access: full
     binaries:
       - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+      - path: /usr/bin/curl
 
   # CRC / OpenShift API via in-cluster kubectl proxy.
   # OpenShell SSRF blocks :6443, so Hermes cannot dial the apiserver directly.

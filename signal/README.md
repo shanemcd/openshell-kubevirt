@@ -24,15 +24,17 @@ Re-link later: `./signal/link.sh` again (scales daemon down first; same PVC).
 
 ## Wire Hermes
 
-Enable Signal in config (`platforms.signal.enabled: true`) and set **literal** env (not OpenShell provider placeholders):
+Enable Signal in config (`platforms.signal.enabled: true`). Do **not** bake `SIGNAL_ACCOUNT` / allowlists into the image `.env` — Hermes `load_dotenv(override=True)` would clobber create-time env. Pass literals at create (never commit real numbers; not `openshell:resolve:` — Hermes reads these via `os.getenv`):
 
 ```bash
-SIGNAL_HTTP_URL=http://signal-cli.default.svc.cluster.local:8080
-SIGNAL_ACCOUNT=+1XXXXXXXXXX          # linked phone, E.164
-SIGNAL_ALLOWED_USERS=+1YYYYYYYYYY    # who may DM the bot
+openshell sandbox create ... \
+  --env "SIGNAL_HTTP_URL=http://signal-cli.default.svc.cluster.local:8080" \
+  --env "SIGNAL_ACCOUNT=+1XXXXXXXXXX" \
+  --env "SIGNAL_ALLOWED_USERS=+1YYYYYYYYYY" \
+  --env "SLACK_ALLOWED_USERS=U…"
 ```
 
-On a live Hermes VM you can append those to `/sandbox/.hermes/.env`, re-hash with `update-config-hashes.py`, enable the platform in `config.yaml`, and restart `openshell-sandbox`.
+`SIGNAL_HTTP_URL` alone may be baked (see `hermes.env.example`). Account / allowlist keys must come from `--env` only.
 
 OpenShell policy must allow the Service host for Hermes python, e.g.:
 
