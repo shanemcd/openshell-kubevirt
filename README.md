@@ -21,7 +21,6 @@ Forks and product code stay in their upstreams; handoff notes, runbooks, and the
 | [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) → [shanemcd/agent-sandbox](https://github.com/shanemcd/agent-sandbox) | `kubevirt-backend` |
 | [NVIDIA/OpenShell](https://github.com/NVIDIA/OpenShell) → [shanemcd/OpenShell](https://github.com/shanemcd/OpenShell) | `vm-runtime-backend` |
 | [NVIDIA/NemoClaw](https://github.com/NVIDIA/NemoClaw) → [shanemcd/NemoClaw](https://github.com/shanemcd/NemoClaw) | `vm-runtime-backend` |
-| [shanemcd/clankr](https://github.com/shanemcd/clankr) (pod Hermes image; bootc moved here) | `main` |
 
 ## Nightly CI
 
