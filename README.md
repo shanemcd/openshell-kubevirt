@@ -41,7 +41,7 @@ Cross-repo git uses a GitHub App installation token (`actions/create-github-app-
 | Variable | `APP_CLIENT_ID` | GitHub App client ID |
 | Secret | `APP_PRIVATE_KEY` | GitHub App private key (PEM) |
 
-App permissions: **Contents: Read and write**. Install on `agent-sandbox`, `OpenShell`, and `NemoClaw`.
+App permissions: **Contents: Read and write**, **Workflows: Read and write** (needed when upstream rebases touch `.github/workflows/*`). Install on `agent-sandbox`, `OpenShell`, and `NemoClaw`.
 
 ```bash
 gh variable set APP_CLIENT_ID --repo shanemcd/openshell-kubevirt --body '<client-id>'

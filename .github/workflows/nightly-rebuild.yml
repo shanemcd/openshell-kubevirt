@@ -24,7 +24,7 @@ on:
 
 concurrency:
   group: nightly-rebuild
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -99,7 +99,13 @@ jobs:
               git rebase --abort || true
               exit 1
             fi
-            git push --force-with-lease origin kubevirt-backend
+            if ! git push --force-with-lease origin kubevirt-backend 2>push.err; then
+              cat push.err >&2
+              if grep -qiE 'workflows permission|without .workflows. permission' push.err; then
+                echo "::error::GitHub App cannot push .github/workflows changes. Grant the App Workflows: Read and write, accept it on installed repos, then re-run."
+              fi
+              exit 1
+            fi
           else
             echo "Skipping rebase/push (rebase=false)"
           fi
@@ -146,7 +152,13 @@ jobs:
               git rebase --abort || true
               exit 1
             fi
-            git push --force-with-lease origin kubevirt-sidecar
+            if ! git push --force-with-lease origin kubevirt-sidecar 2>push.err; then
+              cat push.err >&2
+              if grep -qiE 'workflows permission|without .workflows. permission' push.err; then
+                echo "::error::GitHub App cannot push .github/workflows changes. Grant the App Workflows: Read and write, accept it on installed repos, then re-run."
+              fi
+              exit 1
+            fi
           else
             echo "Skipping rebase/push (rebase=false)"
           fi
@@ -192,14 +204,39 @@ jobs:
               git rebase --abort || true
               exit 1
             fi
-            git push --force-with-lease origin kubevirt-sidecar
+            if ! git push --force-with-lease origin kubevirt-sidecar 2>push.err; then
+              cat push.err >&2
+              if grep -qiE 'workflows permission|without .workflows. permission' push.err; then
+                echo "::error::GitHub App cannot push .github/workflows changes. Grant the App Workflows: Read and write, accept it on installed repos, then re-run."
+              fi
+              exit 1
+            fi
           else
             echo "Skipping rebase/push (rebase=false)"
           fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+  # Gate: do not start image builds until every fork rebase/push succeeded.
+  rebases:
+    needs: [rebase-agent-sandbox, rebase-openshell, rebase-nemoclaw]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all rebases succeeded
+        env:
+          AGENT: ${{ needs.rebase-agent-sandbox.result }}
+          OPENSHELL: ${{ needs.rebase-openshell.result }}
+          NEMOCLAW: ${{ needs.rebase-nemoclaw.result }}
+        run: |
+          set -euo pipefail
+          echo "agent-sandbox=${AGENT} openshell=${OPENSHELL} nemoclaw=${NEMOCLAW}"
+          if [[ "$AGENT" != success || "$OPENSHELL" != success || "$NEMOCLAW" != success ]]; then
+            echo "::error::One or more fork rebases failed; skipping image builds."
+            exit 1
+          fi
+
   build-agent-sandbox:
-    needs: [meta, rebase-agent-sandbox]
+    needs: [meta, rebases, rebase-agent-sandbox]
     if: needs.meta.outputs.push_images == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -242,7 +279,7 @@ jobs:
             .
 
   build-openshell-gateway:
-    needs: [meta, rebase-openshell]
+    needs: [meta, rebases, rebase-openshell]
     if: needs.meta.outputs.push_images == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -294,7 +331,7 @@ jobs:
           done
 
   build-openshell-supervisor:
-    needs: [meta, rebase-openshell]
+    needs: [meta, rebases, rebase-openshell]
     if: needs.meta.outputs.push_images == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -345,7 +382,7 @@ jobs:
           done
 
   build-nemoclaw-hermes:
-    needs: [meta, rebase-nemoclaw]
+    needs: [meta, rebases, rebase-nemoclaw]
     if: needs.meta.outputs.push_images == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -385,12 +422,13 @@ jobs:
             .
 
   build-hermes-bootc:
-    needs: [meta, build-openshell-supervisor, build-nemoclaw-hermes]
+    needs: [meta, rebases, build-openshell-supervisor, build-nemoclaw-hermes]
     # Rebuild when push_images (after deps) or when build_hermes alone (reuse GHCR :nightly deps).
     if: |
       always() &&
       !cancelled() &&
       needs.meta.result == 'success' &&
+      needs.rebases.result == 'success' &&
       (
         needs.meta.outputs.build_hermes == 'true' ||
         needs.meta.outputs.push_images == 'true' &&
