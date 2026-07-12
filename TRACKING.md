@@ -326,6 +326,10 @@ openshell inference set --gateway-endpoint http://127.0.0.1:18080 \
 
 Editing `/sandbox/.hermes/config.yaml` or `.env` on the live VM **without** regenerating hashes crash-loops the workload (`Config integrity check FAILED` / `HERMES_MCP_CONFIG_DRIFT`). Use `update-config-hashes.py` (both `/sandbox/.hermes/.config-hash` and `/etc/nemoclaw/hermes.config-hash`) — format is `sha256sum` lines (`<digest>  <abs-path>`), not `config: <digest>`. Prefer baking changes into the image.
 
+### Operational footgun: kube API from Hermes (OpenShell SSRF)
+
+OpenShell **denies sandbox egress to port 6443** (control-plane SSRF). Do not point `oc` at `api.crc.testing:6443` or expect `kubernetes.default.svc:443` to work from inside the sandbox netns. Use the in-cluster HTTP proxy on `:8080` — runbook + one-shot script: [`kube-proxy/`](./kube-proxy/) (`./kube-proxy/setup.sh`).
+
 ### Operational footgun: Hermes ≥0.18 + OpenShell inference
 
 Do **not** set `model.provider: anthropic` with `base_url: https://inference.local`. Hermes drops the override and calls `api.anthropic.com`, which OpenShell denies → Slack “model provider failed after retries”. Use `provider: custom` + `api_mode: anthropic_messages` + literal `sk-OPENSHELL-PROXY-REWRITE` (see `hermes-config.py` / `hermes.env`).
@@ -353,9 +357,10 @@ Also clear `providers` / `custom_providers` entries named `custom`. A leftover b
 | Slack | **Was working** | Socket Mode through proxy; re-verify after clean Hermes recreate |
 | Inference (`inference.local`) | **Was working** | `provider: custom` + `api_mode: anthropic_messages`; in-cluster `vertex-prod` → Claude Opus |
 | Discord | **Disabled** in image | Token rotation is separate if re-enabled |
-| Signal | **Deferred** | SSRF rejects `host.containers.internal` |
+| Signal | **Working** (CRC) | In-cluster signal-cli; see [`signal/`](./signal/) |
+| Kube API (`oc`) | **Working** (CRC) | Via `hermes-kube-proxy:8080`; see [`kube-proxy/`](./kube-proxy/) — not direct `:6443` |
 | Atlassian MCP | ALLOWED | Proxy allows |
-| GitHub | ALLOWED | Downloads work through proxy |
+| GitHub | ALLOWED | CDN hosts + github provider; install tools under `/sandbox/.hermes/bin` |
 
 ## Still open
 
@@ -376,9 +381,13 @@ virtctl ssh sandbox@vmi/hermes -n default --local-ssh-opts='-oStrictHostKeyCheck
 
 Expect: driver-emitted VCT; PVC Bound; `/sandbox` on `/dev/vdc` (or similar) ext4 with `.workspace-initialized`; survives reboot without seal orphan errors.
 
-#### Signal on VMs (deferred)
+#### Signal on VMs
 
-`SIGNAL_HTTP_URL=http://host.containers.internal:8081` is Podman-specific and blocked by OpenShell SSRF. Point Signal at a routable signal-cli endpoint (or run signal-cli in-cluster).
+**Done on CRC** via in-cluster signal-cli — see [`signal/`](./signal/). `host.containers.internal` remains blocked by OpenShell SSRF; do not use it.
+
+#### Kube API (`oc`) from Hermes
+
+**Done on CRC** via in-cluster kubectl proxy — see [`kube-proxy/`](./kube-proxy/). Direct `:6443` remains blocked by OpenShell SSRF.
 
 #### Discord token (low priority)
 

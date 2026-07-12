@@ -63,10 +63,28 @@ network_policies:
         protocol: rest
         enforcement: enforce
         access: full
+      - host: codeload.github.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      # Release / raw / package CDNs (gh + other GitHub release installs)
+      - host: "*.githubusercontent.com"
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
     binaries:
+      # Downloaders (Landlock: install into /sandbox/... — /usr/local is read-only)
       - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
       - path: /usr/bin/curl
+      - path: /usr/bin/wget
+      # Post-install binary locations
+      - path: /sandbox/.hermes/bin/gh
+      - path: /sandbox/**/bin/gh
       - path: /usr/local/bin/gh
+      - path: /usr/bin/gh
 
   slack:
     name: slack
@@ -100,3 +118,24 @@ network_policies:
         access: full
     binaries:
       - path: /opt/hermes/.venv/bin/python
+
+  # CRC / OpenShift API via in-cluster kubectl proxy.
+  # OpenShell SSRF blocks :6443, so Hermes cannot dial the apiserver directly.
+  kubernetes:
+    name: kubernetes
+    endpoints:
+      - host: hermes-kube-proxy.default.svc.cluster.local
+        port: 8080
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /sandbox/.hermes/bin/oc
+      - path: /sandbox/**/bin/oc
+      - path: /sandbox/.hermes/bin/kubectl
+      - path: /sandbox/.hermes/bin/virtctl
+      - path: /sandbox/bin/virtctl
+      - path: /sandbox/**/bin/virtctl
+      - path: /usr/bin/curl
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
