@@ -182,7 +182,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/NemoClaw
-          ref: kubevirt-sidecar
+          ref: vm-runtime-backend
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
           path: src
@@ -199,12 +199,12 @@ jobs:
           git fetch upstream main
           if [[ "$SHOULD_REBASE" == "true" ]]; then
             if ! git rebase upstream/main; then
-              echo "::error::Rebase conflict on NemoClaw kubevirt-sidecar"
+              echo "::error::Rebase conflict on NemoClaw vm-runtime-backend"
               git status
               git rebase --abort || true
               exit 1
             fi
-            if ! git push --force-with-lease origin kubevirt-sidecar 2>push.err; then
+            if ! git push --force-with-lease origin vm-runtime-backend 2>push.err; then
               cat push.err >&2
               if grep -qiE 'workflows permission|without .workflows. permission' push.err; then
                 echo "::error::GitHub App cannot push .github/workflows changes. Grant the App Workflows: Read and write, accept it on installed repos, then re-run."

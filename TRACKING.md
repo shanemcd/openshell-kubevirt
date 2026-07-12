@@ -17,7 +17,7 @@
 |----------|-------------|---------|
 | [`kubernetes-sigs/agent-sandbox`](https://github.com/kubernetes-sigs/agent-sandbox) | [`shanemcd/agent-sandbox` `kubevirt-backend`](https://github.com/shanemcd/agent-sandbox/tree/kubevirt-backend) | [compare](https://github.com/kubernetes-sigs/agent-sandbox/compare/main...shanemcd:agent-sandbox:kubevirt-backend) |
 | [`NVIDIA/OpenShell`](https://github.com/NVIDIA/OpenShell) | [`shanemcd/OpenShell` `vm-runtime-backend`](https://github.com/shanemcd/OpenShell/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/OpenShell/compare/main...shanemcd:OpenShell:vm-runtime-backend) |
-| [`NVIDIA/NemoClaw`](https://github.com/NVIDIA/NemoClaw) | [`shanemcd/NemoClaw` `kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar) | [compare](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:kubevirt-sidecar) |
+| [`NVIDIA/NemoClaw`](https://github.com/NVIDIA/NemoClaw) | [`shanemcd/NemoClaw` `vm-runtime-backend`](https://github.com/shanemcd/NemoClaw/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:vm-runtime-backend) |
 | — | [`shanemcd/clankr` `main`](https://github.com/shanemcd/clankr) (Hermes bootc image/config; no fork/upstream split) | [repo](https://github.com/shanemcd/clankr) |
 | — | [`shanemcd/openshell-kubevirt`](https://github.com/shanemcd/openshell-kubevirt) (this handoff / tracking) | [repo](https://github.com/shanemcd/openshell-kubevirt) |
 
@@ -27,7 +27,7 @@ Local clones (paths are machine-local; remotes matter more than layout):
 |-------|--------|---------|
 | `kubernetes-sigs/agent-sandbox` | `kubevirt-backend` → `fork/kubevirt-backend` | `origin`=sigs, `fork`=shanemcd |
 | `NVIDIA/OpenShell` (local checkout often under a personal org path) | `vm-runtime-backend` → `fork/vm-runtime-backend` | `origin`=NVIDIA, `fork`=shanemcd |
-| `shanemcd/NemoClaw` | `kubevirt-sidecar` → `fork/kubevirt-sidecar` | `upstream`=NVIDIA, `fork`=shanemcd |
+| `shanemcd/NemoClaw` | `vm-runtime-backend` → `fork/vm-runtime-backend` | `upstream`=NVIDIA, `fork`=shanemcd |
 | `shanemcd/clankr` | `main` → `origin/main` | `origin`=shanemcd/clankr |
 | `shanemcd/openshell-kubevirt` | `main` | this tracking repo (handoff doc) |
 
@@ -136,7 +136,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 
 **As of 2026-07-10 (late) — BRANCHES ON FORKS:** Controller + OpenShell sidecar work pushed to `shanemcd` forks (no upstream PRs yet). Early standalone `openshell-driver-kubevirt` POC dropped from the OpenShell branch; approach is an option on the existing Kubernetes driver + process+network sidecar runtime.
 
-**As of 2026-07-10 (cleanup) — LEAN IMAGE + NEMOCLAW BRANCH:** In-image sed/python patches removed. VM/sibling-supervisor support lives on [`shanemcd/NemoClaw` `kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar) (`NEMOCLAW_VM_SIDECAR=1` / `nemoclaw-start-vm`). Bootc image is Hermes + ddgs only (no rust, build toolchain, or extra CLIs).
+**As of 2026-07-10 (cleanup) — LEAN IMAGE + NEMOCLAW BRANCH:** In-image sed/python patches removed. VM/sibling-supervisor support lives on [`shanemcd/NemoClaw` `vm-runtime-backend`](https://github.com/shanemcd/NemoClaw/tree/vm-runtime-backend) (`NEMOCLAW_VM_SIDECAR=1` / `nemoclaw-start-vm`). Bootc image is Hermes + ddgs only (no rust, build toolchain, or extra CLIs).
 
 **As of 2026-07-10 (late) — HERMES ≥0.18 INFERENCE FIX:** `provider: anthropic` + `base_url: https://inference.local` is ignored by Hermes (`_anthropic_base_url_override_ok`); it falls back to `api.anthropic.com` (DENIED by OpenShell). Live config must use `provider: custom`, `base_url: https://inference.local`, `api_key: sk-OPENSHELL-PROXY-REWRITE`, `api_mode: anthropic_messages`. Hot-fixing config/`.env` requires regenerating hashes in **sha256sum format** via `update-config-hashes.py` (wrong format crash-loops with `Config integrity check FAILED`).
 
@@ -158,7 +158,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 |------|---------------|-------------------|--------------|
 | `kubernetes-sigs/agent-sandbox` | [`kubevirt-backend`](https://github.com/shanemcd/agent-sandbox/tree/kubevirt-backend) | [compare](https://github.com/kubernetes-sigs/agent-sandbox/compare/main...shanemcd:agent-sandbox:kubevirt-backend) | `runtimeBackend: VirtualMachine`, virtio Secret metadata (`sandboxmeta` + Secret disks; no cloud-init), VCT→virtio PVC disks, optional kubevirt RBAC |
 | `NVIDIA/OpenShell` | [`vm-runtime-backend`](https://github.com/shanemcd/OpenShell/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/OpenShell/compare/main...shanemcd:OpenShell:vm-runtime-backend) | Thin VM path: `runtimeBackend` / `sandboxCommand` / `workspace_persistence`, SA Secret bootstrap, VM TLS mounts, `PRESERVE_SANDBOX_OWNERSHIP`. **Archived:** [`kubevirt-sidecar`](https://github.com/shanemcd/OpenShell/tree/kubevirt-sidecar) (fat pod-sidecar + rebase pile) |
-| `NVIDIA/NemoClaw` | [`kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar) | [compare](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:kubevirt-sidecar) | OpenShell-supervised identity (sibling **or parent**) + `nemoclaw-start-vm` (`NEMOCLAW_VM_SIDECAR=1`) |
+| `NVIDIA/NemoClaw` | [`vm-runtime-backend`](https://github.com/shanemcd/NemoClaw/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:vm-runtime-backend) | OpenShell-supervised identity (sibling **or parent**) + `nemoclaw-start-vm` (`NEMOCLAW_VM_SIDECAR=1`). **Archived:** [`kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar) |
 | `shanemcd/clankr` | [`main`](https://github.com/shanemcd/clankr) | — | Pod Hermes image; **bootc guest sources moved to** [`openshell-kubevirt/hermes`](./hermes/) |
 | `shanemcd/openshell-kubevirt` | [`main`](https://github.com/shanemcd/openshell-kubevirt) | — | Living handoff + iteration notes for this project |
 
@@ -169,7 +169,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 | OpenShell preserve-ownership + VM driver | Guest uses `OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1`; source on fork branch `vm-runtime-backend` |
 | agent-sandbox guest metadata | Virtio Secret disk `sandboxmeta` + Secret volumeMount disks; **no cloud-init userdata** |
 | agent-sandbox RBAC | Core ClusterRole Pod-only; optional `agent-sandbox-controller-kubevirt` |
-| NemoClaw VM entrypoint | `nemoclaw-start-vm` from `shanemcd/NemoClaw` `kubevirt-sidecar` (no Containerfile patches) |
+| NemoClaw VM entrypoint | `nemoclaw-start-vm` from `shanemcd/NemoClaw` `vm-runtime-backend` (no Containerfile patches) |
 | clankr bootc disk | Hermes + ddgs; systemd volumes/supervisor units; Slack-only config; qemu-guest-agent |
 | Published disk | CRC IS + `quay.io/shanemcd/hermes-sandbox-kubevirt:latest` |
 | Live Hermes VM | Recreate via CLI (no TLS `--env`); Slack up; GetSandboxConfig OK; `sandbox exec` OK |
@@ -179,7 +179,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 flowchart LR
   subgraph done [Done]
     OS[OpenShell vm-runtime-backend]
-    NC[NemoClaw kubevirt-sidecar]
+    NC[NemoClaw vm-runtime-backend]
     AS[agent-sandbox virtio metadata]
     CF[clankr Containerfile + Slack config]
     Ctrl[Controller on fork]
@@ -411,7 +411,7 @@ Not a VM wiring bug. Image disables Discord. Rotate `DISCORD_BOT_TOKEN` on the *
 |------|--------|
 | agent-sandbox | Fork branch [`kubevirt-backend`](https://github.com/shanemcd/agent-sandbox/tree/kubevirt-backend) includes VM backend + VCT→virtio. [Compare → upstream main](https://github.com/kubernetes-sigs/agent-sandbox/compare/main...shanemcd:agent-sandbox:kubevirt-backend). **No upstream PR yet.** |
 | OpenShell | Fork branch [`vm-runtime-backend`](https://github.com/shanemcd/OpenShell/tree/vm-runtime-backend) is the thin VM PR (~11 files). [Compare → upstream main](https://github.com/NVIDIA/OpenShell/compare/main...shanemcd:OpenShell:vm-runtime-backend). **No upstream PR yet.** [`kubevirt-sidecar`](https://github.com/shanemcd/OpenShell/tree/kubevirt-sidecar) archived. Discard `kubevirt-driver` (standalone POC). |
-| NemoClaw | Fork branch [`kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar). [Compare → upstream main](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:kubevirt-sidecar). **No upstream PR yet.** |
+| NemoClaw | Fork branch [`vm-runtime-backend`](https://github.com/shanemcd/NemoClaw/tree/vm-runtime-backend). [Compare → upstream main](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:vm-runtime-backend). **No upstream PR yet.** [`kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar) archived. |
 | clankr | [`shanemcd/clankr` `main`](https://github.com/shanemcd/clankr) — lean image/config/docs. |
 
 Local clones: OpenShell remotes should be `origin=NVIDIA/OpenShell`, `fork=shanemcd/OpenShell`. NemoClaw: `upstream=NVIDIA/NemoClaw`, `fork=shanemcd/NemoClaw`. agent-sandbox: `origin=kubernetes-sigs/agent-sandbox`, `fork=shanemcd/agent-sandbox`.
@@ -469,7 +469,7 @@ Older process-mode cloud-init snippets in this doc are **historical** (Hermes bo
 
 CRDs regenerated with `make fix-go-generate` (conversion webhook via `sort-crd-versions`).
 
-### `NVIDIA/NemoClaw` → fork branch `kubevirt-sidecar`
+### `NVIDIA/NemoClaw` → fork branch `vm-runtime-backend`
 
 **`agents/hermes/runtime-config-guard.py`:** when `NEMOCLAW_VM_SIDECAR=1`, accept sibling `openshell-sandbox` identity and skip PID-1 readiness proofs.
 
