@@ -17,11 +17,10 @@ unset OPENSHELL_GATEWAY_ENDPOINT
 | `ghcr.io/shanemcd/openshell-gateway:nightly` | STS `openshell/openshell` |
 | `ghcr.io/shanemcd/openshell-supervisor:nightly` | Intermediate only (baked into bootc) |
 | `ghcr.io/shanemcd/nemoclaw-hermes:kubevirt` | Intermediate only (baked into bootc) |
-| `ghcr.io/shanemcd/hermes-sandbox-bootc:nightly` | Bootc OS image — **not** a Sandbox disk |
+| `ghcr.io/shanemcd/hermes-sandbox-bootc:nightly` | Intermediate bootc OS image (input to containerDisk) |
+| `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | Sandbox `containers[0].image` (KubeVirt containerDisk) |
 
 Tags also include `YYYYMMDD` and `sha-<short>`. Prefer **digest** pins over moving tags.
-
-**Not published by nightly:** `hermes-sandbox-kubevirt` containerDisk (qcow2). That still needs bootc-image-builder → disk package → CRC IS / Quay.
 
 ## 1. Controller + gateway (script)
 
@@ -58,14 +57,23 @@ kubectl apply -f k8s/kubevirt-rbac.generated.yaml -f k8s/kubevirt.yaml
 
 ## 2. Hermes VM / containerDisk
 
-Nightly stops at `hermes-sandbox-bootc`. To refresh the guest disk:
+Nightly publishes `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` (bootc-image-builder → `/disk/fedora.qcow2`).
 
-1. Pull `ghcr.io/shanemcd/hermes-sandbox-bootc:nightly`
-2. Run bootc-image-builder (privileged CRC job / self-hosted) → qcow2
-3. Repackage as containerDisk (`COPY … /disk/….qcow2`) → push CRC `openshell-sandboxes/hermes-sandbox-kubevirt` and/or Quay
-4. Recreate the sandbox with that image (`OPENSHELL_GATEWAY=crc`)
+```bash
+DISK_DIG=$(crane digest ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly)
+# Point Sandbox / create flow at:
+#   ghcr.io/shanemcd/hermes-sandbox-kubevirt@${DISK_DIG}
+# Or mirror into CRC ImageStream / Quay, then recreate:
+#   export OPENSHELL_GATEWAY=crc
+```
 
-Until that pipeline is automated, keep using Quay/CRC `hermes-sandbox-kubevirt` for creates.
+Optional Quay mirror:
+
+```bash
+crane copy \
+  "ghcr.io/shanemcd/hermes-sandbox-kubevirt@${DISK_DIG}" \
+  quay.io/shanemcd/hermes-sandbox-kubevirt:latest
+```
 
 ## 3. Smoke
 

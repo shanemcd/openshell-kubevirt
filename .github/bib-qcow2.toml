@@ -1,0 +1,2 @@
+# Minimal bootc-image-builder config for hermes-sandbox-kubevirt.
+# Guest customizations live in the hermes-sandbox-bootc Containerfile.

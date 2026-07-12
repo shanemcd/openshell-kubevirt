@@ -8,7 +8,7 @@ This is intentionally a thin meta-repo: forks and product code stay in their ups
 
 - **[`AGENT-SANDBOX-VM.md`](./AGENT-SANDBOX-VM.md)** — piece-by-piece demo of the agent-sandbox `VirtualMachine` backend only (metadata, PVCs, Secret disks, RBAC).
 - **[`VM-HERMES-BLOCKER.md`](./VM-HERMES-BLOCKER.md)** — living CRC handoff for the full Hermes / OpenShell stack (branches, redeploy gotchas, next actions).
-- **[`REDEPLOY.md`](./REDEPLOY.md)** — pin CRC controller/gateway from nightly GHCR; Hermes disk still needs qcow2 packaging.
+- **[`REDEPLOY.md`](./REDEPLOY.md)** — pin CRC controller/gateway (and Hermes containerDisk) from nightly GHCR.
 
 ## Related repos
 
@@ -27,8 +27,9 @@ Workflow: [`.github/workflows/nightly-rebuild.yml`](.github/workflows/nightly-re
 - **Manual:** Actions → *Nightly rebase and rebuild* → Run workflow
   - `rebase` (default on): rebase forks onto upstream `main` and force-push when clean; fail on conflicts
   - `push_images` (default on): build/push GHCR images
+  - `build_container_disk` (default on): bootc-image-builder → `hermes-sandbox-kubevirt` containerDisk (long; needs privileged runner)
 
-Rebases run in parallel for agent-sandbox, OpenShell, and NemoClaw. Image builds that can run in parallel do; `hermes-sandbox-bootc` waits on supervisor + nemoclaw-hermes.
+Rebases run in parallel for agent-sandbox, OpenShell, and NemoClaw. Image builds that can run in parallel do; `hermes-sandbox-bootc` waits on supervisor + nemoclaw-hermes; `hermes-sandbox-kubevirt` waits on bootc.
 
 Cross-repo git uses a GitHub App installation token (`actions/create-github-app-token`). GHCR push uses `GITHUB_TOKEN`.
 
@@ -55,12 +56,11 @@ gh secret set APP_PRIVATE_KEY --repo shanemcd/openshell-kubevirt < /path/to/app.
 | `ghcr.io/shanemcd/openshell-supervisor` | OpenShell `kubevirt-sidecar` |
 | `ghcr.io/shanemcd/nemoclaw-hermes` | NemoClaw `kubevirt-sidecar` |
 | `ghcr.io/shanemcd/hermes-sandbox-bootc` | clankr `main` |
+| `ghcr.io/shanemcd/hermes-sandbox-kubevirt` | bootc → qcow2 containerDisk (`/disk/fedora.qcow2`) |
 
 Tags: `nightly`, `YYYYMMDD`, `sha-<short>` (plus `kubevirt` on nemoclaw-hermes / openshell-supervisor).
 
-**Not built here:** `hermes-sandbox-kubevirt` containerDisk (qcow2 via bootc-image-builder) — still CRC / Quay / privileged runner.
-
 ## Published images
 
-- Nightly OCI layers: see **GHCR images** above
-- Container disk (manual/CRC): [`quay.io/shanemcd/hermes-sandbox-kubevirt:latest`](https://quay.io/repository/shanemcd/hermes-sandbox-kubevirt)
+- Nightly OCI layers + containerDisk: see **GHCR images** above
+- Quay mirror (optional): [`quay.io/shanemcd/hermes-sandbox-kubevirt:latest`](https://quay.io/repository/shanemcd/hermes-sandbox-kubevirt)
