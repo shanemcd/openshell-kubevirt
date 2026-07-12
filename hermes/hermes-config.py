@@ -23,7 +23,7 @@ SETTINGS = {
     },
     "platforms": {
         "discord": {"enabled": False},
-        "signal": {"enabled": False},
+        "signal": {"enabled": True},
         "slack": {"enabled": True},
     },
     "web": {
