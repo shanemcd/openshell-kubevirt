@@ -21,6 +21,10 @@ on:
         description: Rebuild hermes-sandbox-bootc from hermes/ in this repo (uses existing GHCR supervisor/nemoclaw)
         type: boolean
         default: false
+      build_site_hermes:
+        description: Layer toolbox openshell-kubevirt/ onto bootc → hermes-site-bootc + hermes-site-kubevirt
+        type: boolean
+        default: true
 
 concurrency:
   group: nightly-rebuild
@@ -42,6 +46,7 @@ jobs:
       push_images: ${{ steps.meta.outputs.push_images }}
       build_container_disk: ${{ steps.meta.outputs.build_container_disk }}
       build_hermes: ${{ steps.meta.outputs.build_hermes }}
+      build_site_hermes: ${{ steps.meta.outputs.build_site_hermes }}
     steps:
       - id: meta
         run: |
@@ -52,11 +57,13 @@ jobs:
             echo "push_images=${{ inputs.push_images }}" >> "$GITHUB_OUTPUT"
             echo "build_container_disk=${{ inputs.build_container_disk }}" >> "$GITHUB_OUTPUT"
             echo "build_hermes=${{ inputs.build_hermes }}" >> "$GITHUB_OUTPUT"
+            echo "build_site_hermes=${{ inputs.build_site_hermes }}" >> "$GITHUB_OUTPUT"
           else
             echo "rebase=true" >> "$GITHUB_OUTPUT"
             echo "push_images=true" >> "$GITHUB_OUTPUT"
             echo "build_container_disk=true" >> "$GITHUB_OUTPUT"
             echo "build_hermes=false" >> "$GITHUB_OUTPUT"
+            echo "build_site_hermes=true" >> "$GITHUB_OUTPUT"
           fi
 
   rebase-agent-sandbox:
@@ -554,4 +561,91 @@ jobs:
             -t "${IMAGE}:nightly" \
             -t "${IMAGE}:${DATE}" \
             -t "${IMAGE}:sha-${SHORT}" \
+            "$PKG"
+
+  # Site Hermes layers live in shanemcd/toolbox (openshell-kubevirt/); CI is
+  # centralized here so public bootc + site disk rebuild in one pipeline.
+  build-hermes-site:
+    needs: [meta, build-hermes-bootc]
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.meta.outputs.build_site_hermes == 'true' &&
+      needs.build-hermes-bootc.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      BOOTC_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-site-bootc
+      DISK_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-site-kubevirt
+      BASE_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-sandbox-bootc:nightly
+    steps:
+      - name: Checkout toolbox site layers
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/toolbox
+          path: toolbox
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push hermes-site-bootc
+        working-directory: toolbox/openshell-kubevirt
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
+            -t "${BOOTC_IMAGE}:latest" \
+            -t "${BOOTC_IMAGE}:${DATE}" \
+            -t "${BOOTC_IMAGE}:nightly" \
+            -f Containerfile .
+
+      - name: Login rootful podman to GHCR
+        run: |
+          set -euo pipefail
+          echo "USER_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "USER_GID=$(id -g)" >> "$GITHUB_ENV"
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io \
+            -u "${{ github.actor }}" --password-stdin
+
+      - name: Build qcow2 with bootc-image-builder
+        id: bib
+        uses: osbuild/bootc-image-builder-action@v0.0.2
+        with:
+          config-file: ${{ github.workspace }}/toolbox/openshell-kubevirt/bib-qcow2.toml
+          image: ${{ env.BOOTC_IMAGE }}:nightly
+          types: qcow2
+          rootfs: ext4
+          chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
+          additional-args: --use-librepo=True
+
+      - name: Package and push hermes-site-kubevirt
+        working-directory: toolbox/openshell-kubevirt
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+          QCOW2: ${{ steps.bib.outputs.qcow2-output-path }}
+        run: |
+          set -euo pipefail
+          test -n "$QCOW2"
+          test -f "$QCOW2"
+
+          PKG=$(mktemp -d)
+          mkdir -p "$PKG/disk"
+          cp "$QCOW2" "$PKG/disk/fedora.qcow2"
+          cp Containerfile.disk "$PKG/Dockerfile"
+
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            -t "${DISK_IMAGE}:latest" \
+            -t "${DISK_IMAGE}:${DATE}" \
+            -t "${DISK_IMAGE}:nightly" \
             "$PKG"

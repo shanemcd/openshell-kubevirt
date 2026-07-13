@@ -31,8 +31,9 @@ Workflow: [`.github/workflows/nightly-rebuild.yml`](.github/workflows/nightly-re
   - `rebase` (default on): rebase forks onto upstream `main` and force-push when clean; fail on conflicts
   - `push_images` (default on): build/push GHCR images
   - `build_container_disk` (default on): bootc-image-builder → `hermes-sandbox-kubevirt` containerDisk (long; needs privileged runner)
+  - `build_site_hermes` (default on): checkout [`shanemcd/toolbox`](https://github.com/shanemcd/toolbox) `openshell-kubevirt/` → `hermes-site-bootc` + `hermes-site-kubevirt`
 
-Rebases run in parallel for agent-sandbox, OpenShell, and NemoClaw. Image builds that can run in parallel do; `hermes-sandbox-bootc` waits on supervisor + nemoclaw-hermes; `hermes-sandbox-kubevirt` waits on bootc.
+Rebases run in parallel for agent-sandbox, OpenShell, and NemoClaw. Image builds that can run in parallel do; `hermes-sandbox-bootc` waits on supervisor + nemoclaw-hermes; `hermes-sandbox-kubevirt` waits on bootc; site Hermes waits on bootc and layers toolbox sources.
 
 Cross-repo git uses a GitHub App installation token (`actions/create-github-app-token`). GHCR push uses `GITHUB_TOKEN`.
 
@@ -43,13 +44,14 @@ Cross-repo git uses a GitHub App installation token (`actions/create-github-app-
 | Variable | `APP_CLIENT_ID` | GitHub App client ID |
 | Secret | `APP_PRIVATE_KEY` | GitHub App private key (PEM) |
 
-App permissions: **Contents: Read and write**, **Workflows: Read and write** (needed when upstream rebases touch `.github/workflows/*`). Install on `agent-sandbox`, `OpenShell`, and `NemoClaw`.
+App permissions: **Contents: Read and write**, **Workflows: Read and write** (needed when upstream rebases touch `.github/workflows/*`). Install on `agent-sandbox`, `OpenShell`, and `NemoClaw`. Site Hermes sources are checked out from public `toolbox` (no App install required).
 
 ```bash
 gh variable set APP_CLIENT_ID --repo shanemcd/openshell-kubevirt --body '<client-id>'
 gh secret set APP_PRIVATE_KEY --repo shanemcd/openshell-kubevirt < /path/to/app.pem
 ```
 
+`hermes-site-*` GHCR packages were first published from toolbox and may still be linked there. If `build-hermes-site` cannot push, add **openshell-kubevirt** with Write under each package’s Manage Actions access.
 ### GHCR images (amd64)
 
 | Image | Source |
@@ -60,8 +62,10 @@ gh secret set APP_PRIVATE_KEY --repo shanemcd/openshell-kubevirt < /path/to/app.
 | `ghcr.io/shanemcd/nemoclaw-hermes` | NemoClaw `vm-runtime-backend` |
 | `ghcr.io/shanemcd/hermes-sandbox-bootc` | this repo [`hermes/`](./hermes/) |
 | `ghcr.io/shanemcd/hermes-sandbox-kubevirt` | bootc → qcow2 containerDisk (`/disk/fedora.qcow2`) |
+| `ghcr.io/shanemcd/hermes-site-bootc` | [`shanemcd/toolbox`](https://github.com/shanemcd/toolbox) `openshell-kubevirt/` on public bootc |
+| `ghcr.io/shanemcd/hermes-site-kubevirt` | site bootc → qcow2 containerDisk (CRC / create `--from`) |
 
-Tags: `nightly`, `YYYYMMDD`, `sha-<short>` (plus `kubevirt` on nemoclaw-hermes / openshell-supervisor).
+Tags: `nightly`, `YYYYMMDD`, `sha-<short>` (plus `kubevirt` on nemoclaw-hermes / openshell-supervisor; site also tags `latest`).
 
 ## Published images
 
