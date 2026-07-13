@@ -241,3 +241,80 @@ network_policies:
       - path: /opt/hermes/.venv/bin/python
       - path: /usr/bin/python3.13
       - path: /usr/bin/curl
+
+  # jirahhh / Atlassian REST (Basic auth rewritten by --provider atlassian)
+  atlassian_jira:
+    name: atlassian-jira
+    endpoints:
+      - host: redhat.atlassian.net
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: "*.atlassian.net"
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+      - path: /opt/hermes/.venv/bin/jirahhh
+      - path: /sandbox/**/bin/jirahhh
+      - path: /usr/bin/curl
+
+  atlassian_mcp:
+    name: atlassian-mcp
+    endpoints:
+      - host: mcp.atlassian.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: id.atlassian.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+      - path: /usr/bin/curl
+
+  # Google Workspace CLI (gws) — discovery hits www.googleapis.com first
+  google_workspace:
+    name: google-workspace
+    endpoints:
+      - host: gmail.googleapis.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: calendar-json.googleapis.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: www.googleapis.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: oauth2.googleapis.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+        request_body_credential_rewrite: true
+      - host: accounts.google.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /usr/bin/python3.13
+      - path: /usr/local/lib/node_modules/@googleworkspace/cli/bin/gws
+      - path: /usr/lib/node_modules/@googleworkspace/cli/bin/gws
+      - path: /usr/local/bin/gws
+      - path: /usr/bin/gws
+      - path: /usr/bin/curl
