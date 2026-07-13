@@ -10,7 +10,14 @@ DROPIN_DIR=/run/openshell
 DROPIN_ENV="${DROPIN_DIR}/supervisor.env"
 
 mkdir -p /etc/openshell/auth "$TLS_DIR" "$DROPIN_DIR"
+# Recreate the drop-in instead of truncating in place so a leftover
+# unwritable/misowned supervisor.env (e.g. after hand-edits) cannot brick restarts.
+chown root:root "$DROPIN_DIR" 2>/dev/null || true
+chmod 0755 "$DROPIN_DIR" 2>/dev/null || true
+rm -f "$DROPIN_ENV"
+umask 022
 : >"$DROPIN_ENV"
+chmod 0644 "$DROPIN_ENV"
 
 if [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
