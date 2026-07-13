@@ -19,6 +19,7 @@ unset OPENSHELL_GATEWAY_ENDPOINT
 | `ghcr.io/shanemcd/nemoclaw-hermes:kubevirt` | Intermediate only (baked into bootc) |
 | `ghcr.io/shanemcd/hermes-sandbox-bootc:nightly` | Intermediate bootc OS image (input to containerDisk) |
 | `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | Sandbox `containers[0].image` (KubeVirt containerDisk) |
+| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site containerDisk (toolbox layers on public bootc) |
 
 Tags also include `YYYYMMDD` and `sha-<short>`. Prefer **digest** pins over moving tags.
 
@@ -57,14 +58,18 @@ kubectl apply -f k8s/kubevirt-rbac.generated.yaml -f k8s/kubevirt.yaml
 
 ## 2. Hermes VM / containerDisk
 
-Nightly publishes `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` (bootc-image-builder → `/disk/fedora.qcow2`).
+Nightly publishes:
+
+| Image | Use |
+|-------|-----|
+| `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | Public lean guest (bootc → qcow2 containerDisk) |
+| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site layers (`jirahhh`, `gh`, guest docs) on that base |
 
 ```bash
 DISK_DIG=$(crane digest ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly)
-# Point Sandbox / create flow at:
-#   ghcr.io/shanemcd/hermes-sandbox-kubevirt@${DISK_DIG}
-# Or mirror into CRC ImageStream / Quay, then recreate:
-#   export OPENSHELL_GATEWAY=crc
+# or site:
+# DISK_DIG=$(crane digest ghcr.io/shanemcd/hermes-site-kubevirt:nightly)
+IMAGE="ghcr.io/shanemcd/hermes-sandbox-kubevirt@${DISK_DIG}"
 ```
 
 Optional Quay mirror:
@@ -75,9 +80,85 @@ crane copy \
   quay.io/shanemcd/hermes-sandbox-kubevirt:latest
 ```
 
+### 2a. Upgrade disk in place (keep `/sandbox` data) — preferred
+
+Hermes agent state lives on PVC `workspace-hermes` mounted at `/sandbox`. That claim is owned by the Sandbox CR, so **`openshell sandbox delete` wipes it**. To change only the OS/containerDisk:
+
+1. Patch the Sandbox image.
+2. Wait for the controller to sync `VirtualMachine` `containerDisk.image` (agent-sandbox `kubevirt-backend` with containerDisk sync).
+3. `virtctl restart` (or reboot the guest) so a new VMI boots the new disk. The controller does **not** auto-restart the VMI.
+
+```bash
+export KUBECONFIG=~/.crc/machines/crc/kubeconfig
+NS=default
+NAME=hermes
+# IMAGE=...@sha256:...   # from crane digest above
+
+oc -n "$NS" patch sandbox "$NAME" --type=json -p="[{
+  \"op\":\"replace\",
+  \"path\":\"/spec/podTemplate/spec/containers/0/image\",
+  \"value\":\"${IMAGE}\"
+}]"
+
+# Controller should copy the image onto the VM; confirm before restart:
+for i in $(seq 1 30); do
+  img=$(oc -n "$NS" get vm "$NAME" -o jsonpath='{.spec.template.spec.volumes[?(@.name=="containerdisk")].containerDisk.image}')
+  [[ "$img" == "$IMAGE" ]] && break
+  sleep 2
+done
+oc -n "$NS" get vm "$NAME" -o jsonpath='{.spec.template.spec.volumes[?(@.name=="containerdisk")].containerDisk.image}{"\n"}'
+
+virtctl restart "$NAME" -n "$NS"
+```
+
+**Older controllers** (before containerDisk sync on reconcile): also patch the VM volume directly — the Sandbox image field alone did not update an existing VM:
+
+```bash
+IDX=$(oc -n "$NS" get vm "$NAME" -o json | python3 -c '
+import json,sys
+vm=json.load(sys.stdin)
+vols=vm["spec"]["template"]["spec"]["volumes"]
+print(next(i for i,v in enumerate(vols) if v.get("name")=="containerdisk"))
+')
+oc -n "$NS" patch vm "$NAME" --type=json -p="[{
+  \"op\":\"replace\",
+  \"path\":\"/spec/template/spec/volumes/${IDX}/containerDisk/image\",
+  \"value\":\"${IMAGE}\"
+}]"
+```
+
+Verify after SSH is up:
+
+```bash
+# Same PVC (creationTimestamp / uid unchanged)
+oc -n "$NS" get pvc workspace-hermes -o jsonpath='uid={.metadata.uid} created={.metadata.creationTimestamp}{"\n"}'
+
+# Guest rootfs is the new image; /sandbox is still the PVC
+virtctl ssh root@vmi/"$NAME"/"$NS" -i ~/.ssh/id_rsa \
+  --local-ssh-opts=-oStrictHostKeyChecking=no \
+  --command='findmnt -n /sandbox; bootc status 2>/dev/null | head -20'
+```
+
+Notes:
+
+- Site-only files copied into `/sandbox` in the image (e.g. `/sandbox/.config/jirahhh`) appear on **first** PVC seed only. An existing PVC keeps its tree; rootfs-only bits (`/opt/hermes/.../jirahhh`, `/usr/local/bin/gh`) still update with the disk.
+- After restart, confirm `openshell-sandbox` + (if `SUPERVISOR_MODE=network`) `sandbox-workload` are active and Signal/Slack reconnect. Provider attaches survive in-place upgrades (they are gateway metadata keyed by sandbox name, not guest disk).
+- Optionally pin gateway `default_image` in `openshell/openshell-config` to the same digest so the next **create** matches; that is separate from upgrading this VM.
+
+### 2b. Recreate (wipes `/sandbox` unless you orphan the PVC)
+
+```bash
+# Destructive: Sandbox ownerRef deletes workspace-hermes
+openshell sandbox delete hermes
+openshell sandbox create --from "$IMAGE" --name hermes ...
+# then §3 attach providers
+```
+
+To recreate the Sandbox CR but keep data, orphan the claim first (`remove ownerReferences`, label `agents.x-k8s.io/adoptable=true`), delete, recreate with the **same name** so the controller can adopt `workspace-<name>`. Prefer §2a when you only need a new guest OS.
+
 ## 3. After every Hermes create / recreate — attach providers
 
-Provider links are **per-sandbox** and are wiped on delete/recreate. Inference can still work via the OpenShell inference bundle without an attach, but GitHub/Slack/Atlassian env rewrite will not.
+Provider links are **per-sandbox** and are wiped on **delete/recreate**. Inference can still work via the OpenShell inference bundle without an attach, but GitHub/Slack/Atlassian env rewrite will not. In-place disk upgrades (§2a) do **not** clear attaches.
 
 Always attach the full CRC set (skip `discord` — image disables that platform):
 
@@ -114,7 +195,7 @@ openshell sandbox exec whoami   # expect: sandbox
 openshell sandbox provider list hermes   # expect: github, slack, vertex-prod, atlassian
 ```
 
-Also confirm Slack / Signal / inference if you recreated the Hermes VM.
+Also confirm Slack / Signal / inference after an in-place disk restart or recreate.
 
 ## Notes
 
