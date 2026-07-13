@@ -274,12 +274,12 @@ Pod sandboxes use a kubelet-projected SA token. VMs cannot, so when the Sandbox 
 
 1. Creates a companion Pod `{sandbox}-openshell-bootstrap` (pause image), Sandbox-owned, with `openshell.io/sandbox-id` and the same `serviceAccountName` as the template
 2. Mints a `TokenRequest` (`audience: openshell-gateway`, BoundObjectRef → bootstrap Pod)
-3. Writes the JWT into Secret `{sandbox}-openshell-sa-token` key `token`, refreshing before expiry
-4. Attaches that Secret as a virtio disk (same path as Piece 5)
+3. Writes the JWT into Secret `{sandbox}-openshell-sa-token` key `token`, refreshing before expiry **or when the bootstrap Pod UID changes** (annotations `openshell.io/sa-token-expiration` + `openshell.io/sa-token-bound-pod-uid`)
+4. Attaches that Secret as a **virtiofs** filesystem (not an ISO disk) so remints propagate into a running guest — KubeVirt Secret-as-disk does not hot-refresh
 
-The guest mounts it at `/var/run/secrets/openshell/token` and calls `IssueSandboxToken` — including after reboot, when a static gateway JWT would have expired.
+The guest mounts the virtiofs share at `/var/run/secrets/openshell` (`volumes.json` `source: virtiofs`) and calls `IssueSandboxToken` — including after reboot or supervisor restart, when a static gateway JWT would have expired.
 
-Implementation: `controllers/vm_openshell_bootstrap.go`. Requires the kubevirt ClusterRole rules for `serviceaccounts` get + `serviceaccounts/token` create.
+Implementation: `controllers/vm_openshell_bootstrap.go` + virtiofs path in `vm_backend.go`. Requires the kubevirt ClusterRole rules for `serviceaccounts` get + `serviceaccounts/token` create. Guest: `prepare-sandbox-volumes.sh` `mount_secret_virtiofs`.
 
 ---
 

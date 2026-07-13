@@ -7,6 +7,10 @@
 # KubeVirt Secret disks are iso9660 (iso9660_t). SELinux blocks systemd
 # services from sourcing/reading those paths, so we stage-mount and copy
 # onto normal filesystem locations under /etc.
+#
+# The OpenShell SA bootstrap JWT uses virtiofs (volumes.json source=virtiofs)
+# so Secret remints propagate into a running guest without reboot — ISO Secret
+# disks do not hot-refresh.
 set -euo pipefail
 
 sysctl -q -w kernel.printk="3 4 1 7" 2>/dev/null || true
@@ -147,14 +151,48 @@ mount_secret_disk() {
   fi
 }
 
+# Mount a KubeVirt Secret via virtiofs (tag = volume name). Keep it mounted —
+# do not copy — so Secret remints appear without reboot.
+mount_secret_virtiofs() {
+  local tag="$1"
+  local mount_path="$2"
+  mkdir -p "$mount_path"
+  if mountpoint -q "$mount_path" 2>/dev/null; then
+    # Already mounted; still tighten token perms if present.
+    if [ -f "$mount_path/token" ]; then
+      chmod 0400 "$mount_path/token" 2>/dev/null || true
+    fi
+    return 0
+  fi
+  local i
+  for i in $(seq 1 60); do
+    if mount -t virtiofs "$tag" "$mount_path" 2>/dev/null; then
+      if [ -f "$mount_path/token" ]; then
+        chmod 0400 "$mount_path/token" 2>/dev/null || true
+      fi
+      if command -v restorecon >/dev/null 2>&1; then
+        restorecon -RF "$mount_path" 2>/dev/null || true
+      fi
+      return 0
+    fi
+    sleep 1
+  done
+  echo "virtiofs tag=${tag} failed to mount at ${mount_path}" >&2
+  return 1
+}
+
 mkdir -p "$STAGE_ROOT"
 mount_sandbox_meta
 
 PVC_PATHS=""
 if [ -f "$VOLUMES_JSON" ]; then
-  while IFS=$'\t' read -r source serial mount_path; do
-    [ -n "$serial" ] || continue
+  while IFS=$'\t' read -r source name serial mount_path; do
+    [ -n "$mount_path" ] || continue
     case "$source" in
+      virtiofs)
+        # Prefer volume name as virtiofs tag; fall back to serial.
+        mount_secret_virtiofs "${name:-$serial}" "$mount_path"
+        ;;
       secret)
         mount_secret_disk "$serial" "$mount_path"
         ;;
@@ -175,11 +213,12 @@ except Exception as e:
     print(f"failed to parse {path}: {e}", file=sys.stderr)
     sys.exit(0)
 for m in data or []:
+    name = m.get("name") or ""
     serial = m.get("serial") or ""
     mount = m.get("mountPath") or ""
     source = m.get("source") or "persistentVolumeClaim"
-    if serial and mount:
-        print(f"{source}\t{serial}\t{mount}")
+    if mount and (serial or name):
+        print(f"{source}\t{name}\t{serial}\t{mount}")
 PY
 )
 fi
