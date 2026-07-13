@@ -210,8 +210,8 @@ if [ -n "$tmpfs_dirs" ]; then
 fi
 
 # Layout only — do not seal trust anchors here. OpenShell's prepare_filesystem
-# recursively chowns /sandbox, then (with OPENSHELL_DEFER_PRIVILEGE_DROP=1)
-# spawns nemoclaw-start-vm as root so NemoClaw seals after that chown.
+# recursively chowns /sandbox, drops to sandbox, then Landlock + exec
+# (same as the Pod path; no OPENSHELL_DEFER_PRIVILEGE_DROP).
 chown root:sandbox /sandbox 2>/dev/null || true
 chmod 1775 /sandbox 2>/dev/null || true
 if [ -d /sandbox/.hermes ]; then

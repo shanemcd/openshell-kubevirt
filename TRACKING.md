@@ -134,7 +134,9 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 
 **As of 2026-07-10 (process mode) — SINGLE SUPERVISOR:** Hermes under `openshell-sandbox` (`--mode=network,process`). No `sandbox-workload` unit.
 
-**As of 2026-07-12 (defer privilege drop):** Guest sets `OPENSHELL_DEFER_PRIVILEGE_DROP=1`. OpenShell chowns `/sandbox`, then spawns `nemoclaw-start-vm` as root under Landlock/seccomp; NemoClaw seals and setpriv-drops (container ENTRYPOINT order).
+**As of 2026-07-12 (defer privilege drop):** Tried `OPENSHELL_DEFER_PRIVILEGE_DROP=1` so NemoClaw could root-seal under the supervisor. Root+Landlock could not mint/write sandbox-owned `.env` (`ensure-api-key` EACCES) → crash loop / Provisioning.
+
+**As of 2026-07-13 (match Pod privilege drop):** Guest no longer sets `OPENSHELL_DEFER_PRIVILEGE_DROP`. OpenShell chowns `/sandbox`, drops to `sandbox`, then Landlock + exec — same as Pods. `nemoclaw-start-vm` takes the non-root path (`NEMOCLAW_CAPS_DROPPED`).
 
 **As of 2026-07-12 (guest default command):** `openshell-sandbox-prep-env.sh` defaults `OPENSHELL_SANDBOX_COMMAND=/usr/local/bin/nemoclaw-start-vm` when metadata omits it. Gateway `sandbox_command` / create `--env` still override. Prefer empty gateway `sandbox_command` so the image owns the entrypoint.
 
@@ -237,7 +239,7 @@ VM (systemd):
   openshell-sandbox.service        ← After/Requires sandbox-volumes; WantedBy=multi-user.target
     └─ openshell-sandbox-prep-env.sh → /run/openshell/supervisor.env
     └─ exec /opt/openshell/bin/openshell-sandbox   (default --mode=network,process)
-         Environment from drop-in (endpoint, K8S SA token path / optional JWT file, TLS paths, SANDBOX_COMMAND, DEFER_PRIVILEGE_DROP=1)
+         Environment from drop-in (endpoint, K8S SA token path / optional JWT file, TLS paths, SANDBOX_COMMAND)
          └─ creates netns + proxy at 10.200.0.1:3128
          └─ prepare_filesystem chowns /sandbox
          └─ forks Landlock/seccomp child as root (defer drop)
@@ -245,7 +247,7 @@ VM (systemd):
                    └─ hermes gateway run
 ```
 
-Earlier two-service (`--mode=network` + `sandbox-workload`) existed because combined mode dropped to sandbox before NemoClaw could seal. Fixed by `OPENSHELL_DEFER_PRIVILEGE_DROP=1` (root entrypoint, self-drop) rather than skipping the `/sandbox` chown.
+Earlier two-service (`--mode=network` + `sandbox-workload`) existed because combined mode dropped to sandbox before NemoClaw could seal. Defer-drop was tried so the entrypoint stayed root under Landlock; that broke `.env` mint writes. Current approach matches Pods: drop to sandbox before exec; NemoClaw uses the non-root startup path.
 
 Controller attaches Secret virtio disks for guest metadata/TLS — **no** OpenShell units or PEM blobs in cloud-init.
 
@@ -478,7 +480,7 @@ CRDs regenerated with `make fix-go-generate` (conversion webhook via `sort-crd-v
 
 **`agents/hermes/validate-env-secret-boundary.py`:** same gate for env-file / runtime-env checks.
 
-**`agents/hermes/start.sh` + `start-vm.sh`:** skip Landlock-hostile `tee` redirects; put `/opt/hermes/.venv/bin` on PATH; when started as root under `OPENSHELL_DEFER_PRIVILEGE_DROP`, take the root seal + setpriv path (only force `NEMOCLAW_CAPS_DROPPED` if already non-root). Wrapper installs as `/usr/local/bin/nemoclaw-start-vm`.
+**`agents/hermes/start.sh` + `start-vm.sh`:** skip Landlock-hostile `tee` redirects; put `/opt/hermes/.venv/bin` on PATH; when already non-root (OpenShell dropped privileges — Pod path and current VM path), force `NEMOCLAW_CAPS_DROPPED` and skip the root seal path. Wrapper installs as `/usr/local/bin/nemoclaw-start-vm`.
 
 ### `shanemcd/clankr` (`main`)
 
