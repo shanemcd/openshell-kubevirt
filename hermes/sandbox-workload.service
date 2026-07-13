@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenShell sandbox workload (Hermes, network-only sibling)
+After=openshell-sandbox.service
+BindsTo=openshell-sandbox.service
+# Created by openshell-sandbox-run.sh when SUPERVISOR_MODE=network.
+ConditionPathExists=/run/openshell/want-workload
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/openshell/sandbox-workload-run.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

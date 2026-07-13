@@ -132,6 +132,8 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 
 **As of 2026-07-10 (evening) — BAKE COMPLETE:** Initial two-service sidecar topology verified (Slack Socket Mode + Vertex inference). Primary contact channel is **Slack**. Discord disabled in image. Signal deferred (SSRF).
 
+**As of 2026-07-13 — DUAL SUPERVISOR MODES:** Guest supports runtime switch between **combined** (`network,process`, default) and **network** (`--mode network` + `sandbox-workload` sibling). Use `openshell-supervisor-mode {combined|network}` on the guest, or `SUPERVISOR_MODE=network` at create. See [`hermes/README.md`](./hermes/README.md).
+
 **As of 2026-07-10 (process mode) — SINGLE SUPERVISOR:** Hermes under `openshell-sandbox` (`--mode=network,process`). No `sandbox-workload` unit.
 
 **As of 2026-07-12 (defer privilege drop):** Tried `OPENSHELL_DEFER_PRIVILEGE_DROP=1` so NemoClaw could root-seal under the supervisor. Root+Landlock could not mint/write sandbox-owned `.env` (`ensure-api-key` EACCES) → crash loop / Provisioning.

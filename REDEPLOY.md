@@ -90,6 +90,21 @@ openshell sandbox provider list hermes
 
 Prefer the same set on create when the CLI supports it (`--provider github --provider slack --provider vertex-prod --provider atlassian`), then still run `provider list` and attach any that are missing.
 
+## 3b. Supervisor mode (combined vs network-only)
+
+Default is **combined** (`network,process`). To run Hermes as a sibling without Landlock (network leaf + `sandbox-workload`):
+
+```bash
+# Persist on recreate:
+openshell sandbox create ... --env "SUPERVISOR_MODE=network"
+
+# Or on a live guest (root), after the mode scripts are baked/copied in:
+virtctl ssh root@vmi/hermes -n default --local-ssh-opts='-oStrictHostKeyChecking=no' \
+  --command='openshell-supervisor-mode network'   # or: combined
+```
+
+Do **not** set `SUPERVISOR_MODE=network` without `sandbox-workload` — Hermes will not start and `exec` will hang.
+
 ## 4. Smoke
 
 ```bash

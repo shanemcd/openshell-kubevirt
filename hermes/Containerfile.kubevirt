@@ -104,15 +104,25 @@ RUN mkdir -p /etc/nemoclaw /run/nemoclaw && \
     chown root:root /etc/nemoclaw/hermes.config-hash && chmod 444 /etc/nemoclaw/hermes.config-hash
 
 # ── Guest bootstrap (image-owned; mounts virtio-sandboxmeta + volumes.json disks) ─
-RUN mkdir -p /usr/local/lib/openshell /etc/sandbox /etc/sysctl.d
+RUN mkdir -p /usr/local/lib/openshell /usr/local/sbin /etc/sandbox /etc/sysctl.d
 COPY prepare-sandbox-volumes.sh /usr/local/lib/openshell/prepare-sandbox-volumes.sh
 COPY openshell-sandbox-prep-env.sh /usr/local/lib/openshell/openshell-sandbox-prep-env.sh
 COPY openshell-sandbox-run.sh /usr/local/lib/openshell/openshell-sandbox-run.sh
+COPY sandbox-workload-run.sh /usr/local/lib/openshell/sandbox-workload-run.sh
+COPY openshell-supervisor-mode.sh /usr/local/lib/openshell/openshell-supervisor-mode
 COPY sandbox-volumes.service /etc/systemd/system/sandbox-volumes.service
 COPY openshell-sandbox.service /etc/systemd/system/openshell-sandbox.service
+COPY sandbox-workload.service /etc/systemd/system/sandbox-workload.service
 COPY 99-openshell-quiet-console.conf /etc/sysctl.d/99-openshell-quiet-console.conf
 RUN chmod 755 /usr/local/lib/openshell/prepare-sandbox-volumes.sh \
       /usr/local/lib/openshell/openshell-sandbox-prep-env.sh \
-      /usr/local/lib/openshell/openshell-sandbox-run.sh && \
-    systemctl enable sandbox-volumes.service openshell-sandbox.service
+      /usr/local/lib/openshell/openshell-sandbox-run.sh \
+      /usr/local/lib/openshell/sandbox-workload-run.sh \
+      /usr/local/lib/openshell/openshell-supervisor-mode && \
+    ln -sf /usr/local/lib/openshell/openshell-supervisor-mode /usr/local/sbin/openshell-supervisor-mode && \
+    systemctl enable sandbox-volumes.service openshell-sandbox.service \
+      sandbox-workload.service
 # /etc/sandbox/{env,volumes.json} come from the sandboxmeta virtio disk at boot.
+# sandbox-workload is enabled but ConditionPathExists=/run/openshell/want-workload
+# so it only runs when SUPERVISOR_MODE=network (see openshell-supervisor-mode).
+

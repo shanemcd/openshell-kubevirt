@@ -22,7 +22,11 @@ done
 # Supervisor leaf mode: omit --mode for binary default (network,process).
 # Override at create time with a non-OPENSHELL_ env (CLI reserves OPENSHELL_*):
 #   openshell sandbox create --env "SUPERVISOR_MODE=network" ...
+# Or at runtime: openshell-supervisor-mode {combined|network}
 # Values: network | process | network,process
+#
+# network → proxy leaf only; sandbox-workload.service runs Hermes in the netns.
+# (combined / unset) → single binary runs netns + Landlock + Hermes child.
 MODE_ARGS=()
 MODE="${SUPERVISOR_MODE:-}"
 if [ -n "$MODE" ]; then
@@ -36,7 +40,14 @@ if [ -n "$MODE" ]; then
   MODE_ARGS=(--mode "$MODE")
 fi
 
+if [ "$MODE" = "network" ]; then
+  touch /run/openshell/want-workload
+else
+  rm -f /run/openshell/want-workload
+fi
+
 # Entrypoint comes from OPENSHELL_SANDBOX_COMMAND in the drop-in (guest default
 # nemoclaw-start-vm, or gateway/create override). Do not pass argv here so an
 # explicit metadata command wins via env; empty metadata uses the guest default.
+# In network-only mode the binary ignores process spawn; Hermes is sandbox-workload.
 exec /opt/openshell/bin/openshell-sandbox "${MODE_ARGS[@]}"
