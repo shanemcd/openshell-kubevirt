@@ -75,6 +75,37 @@ network_policies:
         access: full
     binaries:
       - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+      - path: /usr/bin/curl
+
+  # Live stock quotes / charts (Hermes web_search fallbacks often hit Yahoo).
+  yahoo_finance:
+    name: yahoo-finance
+    endpoints:
+      - host: finance.yahoo.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: query1.finance.yahoo.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: query2.finance.yahoo.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: "*.yahoo.com"
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /opt/hermes/.venv/bin/python
+      - path: /usr/bin/python3.13
+      - path: /usr/bin/curl
 
   github:
     name: github
