@@ -12,7 +12,6 @@ Forks and product code stay in their upstreams; handoff notes, runbooks, and the
 - **[`hermes/`](./hermes/)** — `Containerfile.kubevirt` + guest bootstrap sources for the Hermes bootc / containerDisk images.
 - **[`hermes/OPENSHELL-POLICY.md`](./hermes/OPENSHELL-POLICY.md)** — Hermes instructions: view/diagnose/update OpenShell policy entries (includes always-attach provider set).
 - **[`signal/`](./signal/)** — in-cluster signal-cli for Hermes (`./signal/link.sh`).
-- **[`kube-proxy/`](./kube-proxy/)** — cluster-admin `oc` for Hermes via in-cluster kubectl proxy (`./kube-proxy/setup.sh`; OpenShell blocks `:6443`).
 
 ## Related repos
 
@@ -60,9 +59,9 @@ gh secret set APP_PRIVATE_KEY --repo shanemcd/openshell-kubevirt < /path/to/app.
 | `ghcr.io/shanemcd/openshell-gateway` | OpenShell `vm-runtime-backend` |
 | `ghcr.io/shanemcd/openshell-supervisor` | OpenShell `vm-runtime-backend` |
 | `ghcr.io/shanemcd/nemoclaw-hermes` | NemoClaw `vm-runtime-backend` |
-| `ghcr.io/shanemcd/hermes-sandbox-bootc` | this repo [`hermes/`](./hermes/) |
+| `ghcr.io/shanemcd/hermes-sandbox-bootc` | this repo [`hermes/`](./hermes/) (lean runtime) |
 | `ghcr.io/shanemcd/hermes-sandbox-kubevirt` | bootc → qcow2 containerDisk (`/disk/fedora.qcow2`) |
-| `ghcr.io/shanemcd/hermes-site-bootc` | [`shanemcd/toolbox`](https://github.com/shanemcd/toolbox) `openshell-kubevirt/` on public bootc |
+| `ghcr.io/shanemcd/hermes-site-bootc` | [`shanemcd/toolbox`](https://github.com/shanemcd/toolbox) `openshell-kubevirt/` (gh/glab/gws/jirahhh/oc) on public bootc |
 | `ghcr.io/shanemcd/hermes-site-kubevirt` | site bootc → qcow2 containerDisk (CRC / create `--from`) |
 
 Tags: `nightly`, `YYYYMMDD`, `sha-<short>` (plus `kubevirt` on nemoclaw-hermes / openshell-supervisor; site also tags `latest`).

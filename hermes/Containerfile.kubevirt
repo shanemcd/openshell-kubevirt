@@ -48,11 +48,11 @@ RUN dnf install -y openssh-server openssh-clients cloud-utils-growpart \
       cloud-config.service cloud-final.service 2>/dev/null || true && \
     (command -v setsebool >/dev/null && setsebool -P virt_qemu_ga_manage_ssh on || true)
 
-# ── Core system tools (Hermes runtime only — no rust / build toolchain) ─
+# ── Core system tools (Hermes runtime only — keep lean; site CLIs live in toolbox) ─
 RUN dnf install -y \
       git wget \
       python3.13 python3.13-devel \
-      nodejs npm pandoc \
+      pandoc \
       podman && \
     python3.13 -m ensurepip && \
     dnf clean all

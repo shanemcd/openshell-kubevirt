@@ -338,7 +338,7 @@ Editing `/sandbox/.hermes/config.yaml` or `.env` on the live VM **without** rege
 
 ### Operational footgun: kube API from Hermes (OpenShell SSRF)
 
-OpenShell **denies sandbox egress to port 6443** (control-plane SSRF). Do not point `oc` at `api.crc.testing:6443` or expect `kubernetes.default.svc:443` to work from inside the sandbox netns. Use the in-cluster HTTP proxy on `:8080` — runbook + one-shot script: [`kube-proxy/`](./kube-proxy/) (`./kube-proxy/setup.sh`).
+OpenShell **denies sandbox egress to port 6443** (control-plane SSRF). Do not point `oc` at `api.crc.testing:6443` or expect `kubernetes.default.svc:443` to work from inside the sandbox netns. The old in-cluster `hermes-kube-proxy` + `hermes-admin` SA has been removed.
 
 ### Operational footgun: Hermes ≥0.18 + OpenShell inference
 
@@ -368,7 +368,7 @@ Also clear `providers` / `custom_providers` entries named `custom`. A leftover b
 | Inference (`inference.local`) | **Was working** | `provider: custom` + `api_mode: anthropic_messages`; in-cluster `vertex-prod` → Claude Opus |
 | Discord | **Disabled** in image | Token rotation is separate if re-enabled |
 | Signal | **Working** (CRC) | In-cluster signal-cli; see [`signal/`](./signal/) |
-| Kube API (`oc`) | **Working** (CRC) | Via `hermes-kube-proxy:8080`; see [`kube-proxy/`](./kube-proxy/) — not direct `:6443` |
+| Kube API (`oc`) | **Removed** | `hermes-kube-proxy` + `hermes-admin` deleted; direct `:6443` still SSRF-blocked |
 | Atlassian MCP | ALLOWED | Proxy allows |
 | GitHub | ALLOWED | CDN hosts + github provider; install tools under `/sandbox/.hermes/bin` |
 
@@ -408,7 +408,7 @@ Expect: driver-emitted VCT; PVC Bound; `/sandbox` on `/dev/vdc` (or similar) ext
 
 #### Kube API (`oc`) from Hermes
 
-**Done on CRC** via in-cluster kubectl proxy — see [`kube-proxy/`](./kube-proxy/). Direct `:6443` remains blocked by OpenShell SSRF.
+**Removed:** in-cluster kubectl proxy (`hermes-kube-proxy` / `hermes-admin`). Direct `:6443` remains blocked by OpenShell SSRF.
 
 #### Discord token (low priority)
 

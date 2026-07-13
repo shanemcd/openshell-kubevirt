@@ -1,6 +1,11 @@
 # Hermes bootc (KubeVirt guest)
 
-Build context for `ghcr.io/shanemcd/hermes-sandbox-bootc`. Only files `COPY`d by `Containerfile.kubevirt` live here (plus `hermes.env.example` for CI).
+Build context for `ghcr.io/shanemcd/hermes-sandbox-bootc`. Keep this image **lean**
+(Hermes runtime, supervisor, podman, pandoc). Site CLIs (`gh`, `glab`, `gws`,
+`jirahhh`, `oc`/`kubectl`, node/npm) live in
+[`shanemcd/toolbox`](https://github.com/shanemcd/toolbox) `openshell-kubevirt/`.
+
+Only files `COPY`d by `Containerfile.kubevirt` live here (plus `hermes.env.example` for CI).
 
 ```bash
 cp -n hermes.env.example hermes.env
