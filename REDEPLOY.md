@@ -75,15 +75,31 @@ crane copy \
   quay.io/shanemcd/hermes-sandbox-kubevirt:latest
 ```
 
-## 3. Smoke
+## 3. After every Hermes create / recreate — attach providers
+
+Provider links are **per-sandbox** and are wiped on delete/recreate. Inference can still work via the OpenShell inference bundle without an attach, but GitHub/Slack/Atlassian env rewrite will not.
+
+Always attach the full CRC set (skip `discord` — image disables that platform):
+
+```bash
+for p in github slack vertex-prod atlassian; do
+  openshell sandbox provider attach hermes "$p"
+done
+openshell sandbox provider list hermes
+```
+
+Prefer the same set on create when the CLI supports it (`--provider github --provider slack --provider vertex-prod --provider atlassian`), then still run `provider list` and attach any that are missing.
+
+## 4. Smoke
 
 ```bash
 openshell gateway info
 openshell sandbox list
 openshell sandbox exec whoami   # expect: sandbox
+openshell sandbox provider list hermes   # expect: github, slack, vertex-prod, atlassian
 ```
 
-Also confirm Slack / inference if you recreated the Hermes VM.
+Also confirm Slack / Signal / inference if you recreated the Hermes VM.
 
 ## Notes
 

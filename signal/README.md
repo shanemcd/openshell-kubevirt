@@ -28,10 +28,19 @@ Enable Signal in config (`platforms.signal.enabled: true`). Do **not** bake `SIG
 
 ```bash
 openshell sandbox create ... \
+  --provider github --provider slack --provider vertex-prod --provider atlassian \
   --env "SIGNAL_HTTP_URL=http://signal-cli.default.svc.cluster.local:8080" \
   --env "SIGNAL_ACCOUNT=+1XXXXXXXXXX" \
   --env "SIGNAL_ALLOWED_USERS=+1YYYYYYYYYY" \
   --env "SLACK_ALLOWED_USERS=U…"
+```
+
+After create/recreate, confirm providers are linked (wiped on delete). If `provider list` is empty, attach the full set:
+
+```bash
+for p in github slack vertex-prod atlassian; do
+  openshell sandbox provider attach hermes "$p"
+done
 ```
 
 `SIGNAL_HTTP_URL` alone may be baked (see `hermes.env.example`). Account / allowlist keys must come from `--env` only.

@@ -8,9 +8,9 @@ Forks and product code stay in their upstreams; handoff notes, runbooks, and the
 
 - **[`AGENT-SANDBOX-VM.md`](./AGENT-SANDBOX-VM.md)** — piece-by-piece demo of the agent-sandbox `VirtualMachine` backend only (metadata, PVCs, Secret disks, RBAC).
 - **[`TRACKING.md`](./TRACKING.md)** — living CRC handoff for the full Hermes / OpenShell stack (branches, redeploy gotchas, next actions).
-- **[`REDEPLOY.md`](./REDEPLOY.md)** — pin CRC controller/gateway (and Hermes containerDisk) from nightly GHCR.
+- **[`REDEPLOY.md`](./REDEPLOY.md)** — pin CRC controller/gateway (and Hermes containerDisk) from nightly GHCR; **always re-attach providers** after Hermes recreate.
 - **[`hermes/`](./hermes/)** — `Containerfile.kubevirt` + guest bootstrap sources for the Hermes bootc / containerDisk images.
-- **[`hermes/OPENSHELL-POLICY.md`](./hermes/OPENSHELL-POLICY.md)** — Hermes instructions: view/diagnose/update OpenShell policy entries.
+- **[`hermes/OPENSHELL-POLICY.md`](./hermes/OPENSHELL-POLICY.md)** — Hermes instructions: view/diagnose/update OpenShell policy entries (includes always-attach provider set).
 - **[`signal/`](./signal/)** — in-cluster signal-cli for Hermes (`./signal/link.sh`).
 - **[`kube-proxy/`](./kube-proxy/)** — cluster-admin `oc` for Hermes via in-cluster kubectl proxy (`./kube-proxy/setup.sh`; OpenShell blocks `:6443`).
 

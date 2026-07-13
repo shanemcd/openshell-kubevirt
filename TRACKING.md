@@ -390,7 +390,8 @@ Hermes already has a Bound `workspace-hermes` PVC and a virtio `workspace` disk,
 export OPENSHELL_GATEWAY=crc
 unset OPENSHELL_GATEWAY_ENDPOINT
 # destroy existing sandbox via openshell CLI (or oc delete sandbox/vm/vmi/pvc as needed)
-openshell sandbox create …   # same Hermes image / name as before
+openshell sandbox create …   # same Hermes image / name as before; pass --provider for github/slack/vertex-prod/atlassian
+for p in github slack vertex-prod atlassian; do openshell sandbox provider attach hermes "$p"; done
 oc -n default get sandbox hermes -o yaml | rg -A20 'volumeClaimTemplates|volumeMounts|runtimeBackend'
 oc -n default get pvc workspace-hermes
 virtctl ssh sandbox@vmi/hermes -n default --local-ssh-opts='-oStrictHostKeyChecking=no' \
@@ -516,6 +517,8 @@ server.workspacePersistence=true
 ```
 
 **In-cluster providers:** github, atlassian, slack, **vertex-prod** (discord may still exist in store but image disables the platform). Inference: `vertex-prod` / `claude-opus-4-6`.
+
+**After every Hermes recreate:** attach all four (`github`, `slack`, `vertex-prod`, `atlassian`). Provider links are per-sandbox and do not survive delete. Vertex can answer via inference without an attach — still attach. See [`REDEPLOY.md`](./REDEPLOY.md) §3.
 
 ### Rebuild / redeploy gateway (CRC local)
 
