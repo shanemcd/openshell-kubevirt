@@ -46,3 +46,8 @@ Boot: `openshell-sandbox` runs prep as `ExecStartPre` (writes
 `/run/openshell/want-workload` when `SUPERVISOR_MODE=network`).
 `sandbox-workload` is `WantedBy=openshell-sandbox` with `After=` +
 `ConditionPathExists` on that gate — no path unit or scripted `systemctl start`.
+
+Rootless podman: image enables linger for `sandbox` (`/var/lib/systemd/linger/sandbox`)
+so `user@10001` provides `/run/user/10001` + session bus at boot.
+`sandbox-workload-run.sh` sets `XDG_RUNTIME_DIR` and `DBUS_SESSION_BUS_ADDRESS`
+after the uid drop context is prepared.

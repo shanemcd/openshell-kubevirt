@@ -64,10 +64,13 @@ if [ "${SANDBOX_WORKLOAD_IN_NETNS:-}" = "1" ]; then
   # Rootless podman (and many tools) key off USER / XDG_RUNTIME_DIR. The
   # workload starts as root then drops uid; without rewriting these, podman
   # tries /run/user/0 and fails with "cannot clone" / permission errors.
+  # Linger (baked at /var/lib/systemd/linger/sandbox) starts user@UID so the
+  # session bus exists; point DBUS at it for systemd cgroup manager.
   export HOME="${HOME:-/sandbox}"
   export USER=sandbox
   export LOGNAME=sandbox
   export XDG_RUNTIME_DIR="/run/user/${SANDBOX_UID}"
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
   mkdir -p "$XDG_RUNTIME_DIR"
   chown "${SANDBOX_UID}:${SANDBOX_GID}" "$XDG_RUNTIME_DIR" 2>/dev/null || true
 

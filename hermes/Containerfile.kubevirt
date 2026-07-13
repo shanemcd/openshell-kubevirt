@@ -26,7 +26,10 @@ RUN groupadd -g 10001 sandbox || true && \
     useradd -u 10001 -g 10001 -m -d /sandbox -s /bin/bash sandbox || true && \
     groupadd -g 10002 gateway || true && \
     useradd -u 10002 -g 10002 -s /usr/sbin/nologin gateway || true && \
-    usermod -aG sandbox gateway
+    usermod -aG sandbox gateway && \
+    # Linger so user@10001 (session bus + /run/user/10001) starts at boot for
+    # rootless podman systemd cgroup manager — without a login session.
+    mkdir -p /var/lib/systemd/linger && touch /var/lib/systemd/linger/sandbox
 
 # ── SSH + qemu-guest-agent (day-2 root via KubeVirt accessCredentials) ─
 # Metadata arrives via virtio disks, not cloud-init. Guest agent is required
