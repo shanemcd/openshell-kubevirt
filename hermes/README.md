@@ -41,3 +41,8 @@ adopt the sibling workload PID. OpenShell (`vm-runtime-backend`) watches
 `/run/openshell/entrypoint.pid` (written by `sandbox-workload-run.sh`) and uses
 that PID as the `/proc/<pid>/net/tcp` anchor — the network leaf stays in the
 host netns while Hermes is in the sandbox netns.
+
+Boot: `openshell-sandbox` runs prep as `ExecStartPre` (writes
+`/run/openshell/want-workload` when `SUPERVISOR_MODE=network`).
+`sandbox-workload` is `WantedBy=openshell-sandbox` with `After=` +
+`ConditionPathExists` on that gate — no path unit or scripted `systemctl start`.

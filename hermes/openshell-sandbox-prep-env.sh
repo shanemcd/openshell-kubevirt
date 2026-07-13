@@ -120,3 +120,13 @@ if [ -f "$ENV_FILE" ]; then
     esac
   done <"$ENV_FILE"
 fi
+
+# Gate sibling Hermes (sandbox-workload) for SUPERVISOR_MODE=network.
+# Must run in ExecStartPre so the file exists before Type=simple marks this
+# unit active — After=openshell-sandbox + WantedBy=openshell-sandbox then
+# start the workload without a path unit or systemctl-from-script.
+if [ "${SUPERVISOR_MODE:-}" = "network" ]; then
+  touch "${DROPIN_DIR}/want-workload"
+else
+  rm -f "${DROPIN_DIR}/want-workload"
+fi

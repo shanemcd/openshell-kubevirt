@@ -6,6 +6,9 @@ Requires=sandbox-volumes.service
 
 [Service]
 Type=simple
+# Prep (incl. want-workload gate) finishes before this unit becomes active so
+# sandbox-workload's After= + ConditionPathExists see a consistent state.
+ExecStartPre=/usr/local/lib/openshell/openshell-sandbox-prep-env.sh
 ExecStart=/usr/local/lib/openshell/openshell-sandbox-run.sh
 Restart=on-failure
 RestartSec=5

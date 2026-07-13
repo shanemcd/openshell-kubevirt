@@ -2,7 +2,7 @@
 Description=OpenShell sandbox workload (Hermes, network-only sibling)
 After=openshell-sandbox.service
 BindsTo=openshell-sandbox.service
-# Created by openshell-sandbox-run.sh when SUPERVISOR_MODE=network.
+# Set in openshell-sandbox ExecStartPre when SUPERVISOR_MODE=network.
 ConditionPathExists=/run/openshell/want-workload
 
 [Service]
@@ -12,4 +12,6 @@ Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.target
+# Pulled in when openshell-sandbox starts (not multi-user). After= waits until
+# the supervisor unit is active, which is after ExecStartPre wrote the gate.
+WantedBy=openshell-sandbox.service

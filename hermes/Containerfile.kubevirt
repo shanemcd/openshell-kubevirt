@@ -123,6 +123,6 @@ RUN chmod 755 /usr/local/lib/openshell/prepare-sandbox-volumes.sh \
     systemctl enable sandbox-volumes.service openshell-sandbox.service \
       sandbox-workload.service
 # /etc/sandbox/{env,volumes.json} come from the sandboxmeta virtio disk at boot.
-# sandbox-workload is enabled but ConditionPathExists=/run/openshell/want-workload
-# so it only runs when SUPERVISOR_MODE=network (see openshell-supervisor-mode).
+# sandbox-workload is WantedBy=openshell-sandbox; the want-workload gate is set
+# in ExecStartPre so After= + ConditionPathExists do not race Type=simple.
 
