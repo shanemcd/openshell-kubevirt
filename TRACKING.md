@@ -31,7 +31,7 @@ Local clones (paths are machine-local; remotes matter more than layout):
 | `shanemcd/clankr` | `main` → `origin/main` | `origin`=shanemcd/clankr |
 | `shanemcd/openshell-kubevirt` | `main` | this tracking repo (handoff doc) |
 
-**OpenShell note (2026-07-12):** Active fork work is thin branch [`vm-runtime-backend`](https://github.com/shanemcd/OpenShell/tree/vm-runtime-backend) (~11 files: VM Sandbox spec + SA/TLS/workspace/command + `PRESERVE_SANDBOX_OWNERSHIP`). Old fat branch [`kubevirt-sidecar`](https://github.com/shanemcd/OpenShell/tree/kubevirt-sidecar) is **archived** (pod sidecar topology + unrelated rebases; not needed for Hermes VM).
+**OpenShell note (2026-07-12):** Active fork work is thin branch [`vm-runtime-backend`](https://github.com/shanemcd/OpenShell/tree/vm-runtime-backend) (VM Sandbox spec + SA/TLS/workspace/command). Old fat branch [`kubevirt-sidecar`](https://github.com/shanemcd/OpenShell/tree/kubevirt-sidecar) is **archived** (pod sidecar topology + unrelated rebases; not needed for Hermes VM).
 
 **agent-sandbox tip (fork):** `e324bbf` optional KubeVirt RBAC; `99bd732` virtio Secret metadata (no cloud-init).
 
@@ -132,7 +132,9 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 
 **As of 2026-07-10 (evening) — BAKE COMPLETE:** Initial two-service sidecar topology verified (Slack Socket Mode + Vertex inference). Primary contact channel is **Slack**. Discord disabled in image. Signal deferred (SSRF).
 
-**As of 2026-07-10 (process mode) — SINGLE SUPERVISOR:** Re-enabled OpenShell `--mode=network,process` via `OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1` (skips recursive `/sandbox` chown that smashed NemoClaw seals). Hermes runs as the Landlock'd non-root child of `openshell-sandbox`. No `sandbox-workload` unit.
+**As of 2026-07-10 (process mode) — SINGLE SUPERVISOR:** Hermes under `openshell-sandbox` (`--mode=network,process`). No `sandbox-workload` unit.
+
+**As of 2026-07-12 (defer privilege drop):** Guest sets `OPENSHELL_DEFER_PRIVILEGE_DROP=1`. OpenShell chowns `/sandbox`, then spawns `nemoclaw-start-vm` as root under Landlock/seccomp; NemoClaw seals and setpriv-drops (container ENTRYPOINT order).
 
 **As of 2026-07-10 (late) — BRANCHES ON FORKS:** Controller + OpenShell sidecar work pushed to `shanemcd` forks (no upstream PRs yet). Early standalone `openshell-driver-kubevirt` POC dropped from the OpenShell branch; approach is an option on the existing Kubernetes driver + process+network sidecar runtime.
 
@@ -157,7 +159,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 | Repo | Fork / branch | Compare vs `main` | What changed |
 |------|---------------|-------------------|--------------|
 | `kubernetes-sigs/agent-sandbox` | [`kubevirt-backend`](https://github.com/shanemcd/agent-sandbox/tree/kubevirt-backend) | [compare](https://github.com/kubernetes-sigs/agent-sandbox/compare/main...shanemcd:agent-sandbox:kubevirt-backend) | `runtimeBackend: VirtualMachine`, virtio Secret metadata (`sandboxmeta` + Secret disks; no cloud-init), VCT→virtio PVC disks, optional kubevirt RBAC |
-| `NVIDIA/OpenShell` | [`vm-runtime-backend`](https://github.com/shanemcd/OpenShell/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/OpenShell/compare/main...shanemcd:OpenShell:vm-runtime-backend) | Thin VM path: `runtimeBackend` / `sandboxCommand` / `workspace_persistence`, SA Secret bootstrap, VM TLS mounts, `PRESERVE_SANDBOX_OWNERSHIP`. **Archived:** [`kubevirt-sidecar`](https://github.com/shanemcd/OpenShell/tree/kubevirt-sidecar) (fat pod-sidecar + rebase pile) |
+| `NVIDIA/OpenShell` | [`vm-runtime-backend`](https://github.com/shanemcd/OpenShell/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/OpenShell/compare/main...shanemcd:OpenShell:vm-runtime-backend) | Thin VM path: `runtimeBackend` / `sandboxCommand` / `workspace_persistence`, SA Secret bootstrap, VM TLS mounts. **Archived:** [`kubevirt-sidecar`](https://github.com/shanemcd/OpenShell/tree/kubevirt-sidecar) (fat pod-sidecar + rebase pile) |
 | `NVIDIA/NemoClaw` | [`vm-runtime-backend`](https://github.com/shanemcd/NemoClaw/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:vm-runtime-backend) | OpenShell-supervised identity (sibling **or parent**) + `nemoclaw-start-vm` (`NEMOCLAW_VM_SIDECAR=1`). **Archived:** [`kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar) |
 | `shanemcd/clankr` | [`main`](https://github.com/shanemcd/clankr) | — | Pod Hermes image; **bootc guest sources moved to** [`openshell-kubevirt/hermes`](./hermes/) |
 | `shanemcd/openshell-kubevirt` | [`main`](https://github.com/shanemcd/openshell-kubevirt) | — | Living handoff + iteration notes for this project |
@@ -166,7 +168,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 
 | Layer | Result |
 |-------|--------|
-| OpenShell preserve-ownership + VM driver | Guest uses `OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1`; source on fork branch `vm-runtime-backend` |
+| OpenShell VM driver | Thin `vm-runtime-backend` fork branch |
 | agent-sandbox guest metadata | Virtio Secret disk `sandboxmeta` + Secret volumeMount disks; **no cloud-init userdata** |
 | agent-sandbox RBAC | Core ClusterRole Pod-only; optional `agent-sandbox-controller-kubevirt` |
 | NemoClaw VM entrypoint | `nemoclaw-start-vm` from `shanemcd/NemoClaw` `vm-runtime-backend` (no Containerfile patches) |
@@ -233,15 +235,15 @@ VM (systemd):
   openshell-sandbox.service        ← After/Requires sandbox-volumes; WantedBy=multi-user.target
     └─ openshell-sandbox-prep-env.sh → /run/openshell/supervisor.env
     └─ exec /opt/openshell/bin/openshell-sandbox   (default --mode=network,process)
-         Environment from drop-in (endpoint, K8S SA token path / optional JWT file, TLS paths, SANDBOX_COMMAND, PRESERVE=1)
+         Environment from drop-in (endpoint, K8S SA token path / optional JWT file, TLS paths, SANDBOX_COMMAND, DEFER_PRIVILEGE_DROP=1)
          └─ creates netns + proxy at 10.200.0.1:3128
-         └─ skips recursive /sandbox chown when PRESERVE set
-         └─ forks Landlock/seccomp child as sandbox (UID 10001)
-              └─ nemoclaw-start-vm (NEMOCLAW_VM_SIDECAR=1)
+         └─ prepare_filesystem chowns /sandbox
+         └─ forks Landlock/seccomp child as root (defer drop)
+              └─ nemoclaw-start-vm (NEMOCLAW_VM_SIDECAR=1) seals then setpriv-drops
                    └─ hermes gateway run
 ```
 
-Earlier two-service (`--mode=network` + `sandbox-workload`) existed because combined mode's recursive chown smashed `root:root` seals. `OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1` removes that need; Landlock applies to Hermes again.
+Earlier two-service (`--mode=network` + `sandbox-workload`) existed because combined mode dropped to sandbox before NemoClaw could seal. Fixed by `OPENSHELL_DEFER_PRIVILEGE_DROP=1` (root entrypoint, self-drop) rather than skipping the `/sandbox` chown.
 
 Controller attaches Secret virtio disks for guest metadata/TLS — **no** OpenShell units or PEM blobs in cloud-init.
 
@@ -449,7 +451,6 @@ Thin PR on current NVIDIA `main` (~11 files / ~550 LOC). **No** pod sidecar topo
 
 **`openshell-driver-kubernetes`:** `runtime_backend` / `sandbox_command` / `workspace_persistence`; `sandbox_to_k8s_spec_vm()` emits VirtualMachine Sandbox CRs with SA Secret `{name}-openshell-sa-token`, client TLS mounts, workspace VCT, and `OPENSHELL_SANDBOX_COMMAND`.
 
-**`openshell-core` + `openshell-supervisor-process`:** `OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1` skips recursive `/sandbox` chown for sealed guest layouts.
 
 Helm `gateway-config` keys: `runtimeBackend`, `sandboxCommand`, `workspacePersistence`.
 
@@ -475,7 +476,7 @@ CRDs regenerated with `make fix-go-generate` (conversion webhook via `sort-crd-v
 
 **`agents/hermes/validate-env-secret-boundary.py`:** same gate for env-file / runtime-env checks.
 
-**`agents/hermes/start.sh` + `start-vm.sh`:** skip Landlock-hostile `tee` redirects; set `NEMOCLAW_CAPS_DROPPED`; put `/opt/hermes/.venv/bin` on PATH. Wrapper installs as `/usr/local/bin/nemoclaw-start-vm`.
+**`agents/hermes/start.sh` + `start-vm.sh`:** skip Landlock-hostile `tee` redirects; put `/opt/hermes/.venv/bin` on PATH; when started as root under `OPENSHELL_DEFER_PRIVILEGE_DROP`, take the root seal + setpriv path (only force `NEMOCLAW_CAPS_DROPPED` if already non-root). Wrapper installs as `/usr/local/bin/nemoclaw-start-vm`.
 
 ### `shanemcd/clankr` (`main`)
 
@@ -553,7 +554,7 @@ Build/push `agent-sandbox-controller:kubevirt` to the CRC registry (prior sessio
 /etc/openshell-tls/openshell-ca.pem
 ```
 
-Process mode injects provider placeholders + proxy/TLS env into the child. Guest env from virtio metadata sets `OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1` so sealed trust anchors stay `root:root`.
+Process mode injects provider placeholders + proxy/TLS env into the child.
 
 ## Debugging tips
 
@@ -588,7 +589,6 @@ sudo nsenter --net=$(cat /run/openshell/netns) env \
 
 | Decision | Rationale |
 |----------|-----------|
-| `OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1` | Skips recursive `/sandbox` chown so `root:root` seals survive process mode |
 | Single supervisor (`network,process`) | Landlock/seccomp apply to Hermes; netns + proxy stay in the same binary |
 | provider.env / process env (not .env mutation) | Mutating `.env` breaks NemoClaw config hashes |
 | Guard via `NEMOCLAW_VM_SIDECAR` | Supervisor may be sibling or parent; stock container proofs stay unchanged |

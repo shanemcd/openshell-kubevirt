@@ -26,6 +26,9 @@ fi
   echo "OPENSHELL_SSH_SOCKET_PATH=${OPENSHELL_SSH_SOCKET_PATH:-/run/openshell/ssh.sock}"
   echo "OPENSHELL_SANDBOX_UID=${OPENSHELL_SANDBOX_UID:-10001}"
   echo "OPENSHELL_SANDBOX_GID=${OPENSHELL_SANDBOX_GID:-10001}"
+  # Match container ENTRYPOINT: OpenShell chowns /sandbox, then spawns the
+  # command as root so NemoClaw can seal and setpriv-drop itself.
+  echo "OPENSHELL_DEFER_PRIVILEGE_DROP=1"
 } >>"$DROPIN_ENV"
 
 if [ -n "${OPENSHELL_SANDBOX_ID:-}" ]; then
@@ -39,7 +42,6 @@ if [ -n "${OPENSHELL_ENDPOINT:-}" ]; then
 fi
 if [ -n "${OPENSHELL_SANDBOX_COMMAND:-}" ]; then
   echo "OPENSHELL_SANDBOX_COMMAND=${OPENSHELL_SANDBOX_COMMAND}" >>"$DROPIN_ENV"
-  echo "OPENSHELL_PRESERVE_SANDBOX_OWNERSHIP=1" >>"$DROPIN_ENV"
 fi
 
 # Prefer K8s SA bootstrap (rebootstrap-capable) over a static gateway JWT.

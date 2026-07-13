@@ -209,19 +209,15 @@ if [ -n "$tmpfs_dirs" ]; then
   done
 fi
 
-# NemoClaw / Hermes seals after remount (root:root trust anchors).
+# Layout only — do not seal trust anchors here. OpenShell's prepare_filesystem
+# recursively chowns /sandbox, then (with OPENSHELL_DEFER_PRIVILEGE_DROP=1)
+# spawns nemoclaw-start-vm as root so NemoClaw seals after that chown.
 chown root:sandbox /sandbox 2>/dev/null || true
 chmod 1775 /sandbox 2>/dev/null || true
 if [ -d /sandbox/.hermes ]; then
   chown -R sandbox:sandbox /sandbox/.hermes 2>/dev/null || true
   chown root:sandbox /sandbox/.hermes 2>/dev/null || true
   chmod 1775 /sandbox/.hermes 2>/dev/null || true
-  for f in config.yaml SOUL.md; do
-    if [ -e "/sandbox/.hermes/$f" ]; then
-      chown root:root "/sandbox/.hermes/$f" 2>/dev/null || true
-      chmod 444 "/sandbox/.hermes/$f" 2>/dev/null || true
-    fi
-  done
   if [ -e /sandbox/.hermes/.config-hash ]; then
     chown sandbox:sandbox /sandbox/.hermes/.config-hash 2>/dev/null || true
     chmod 640 /sandbox/.hermes/.config-hash 2>/dev/null || true
