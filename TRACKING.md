@@ -136,6 +136,8 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 
 **As of 2026-07-12 (defer privilege drop):** Guest sets `OPENSHELL_DEFER_PRIVILEGE_DROP=1`. OpenShell chowns `/sandbox`, then spawns `nemoclaw-start-vm` as root under Landlock/seccomp; NemoClaw seals and setpriv-drops (container ENTRYPOINT order).
 
+**As of 2026-07-12 (guest default command):** `openshell-sandbox-prep-env.sh` defaults `OPENSHELL_SANDBOX_COMMAND=/usr/local/bin/nemoclaw-start-vm` when metadata omits it. Gateway `sandbox_command` / create `--env` still override. Prefer empty gateway `sandbox_command` so the image owns the entrypoint.
+
 **As of 2026-07-10 (late) — BRANCHES ON FORKS:** Controller + OpenShell sidecar work pushed to `shanemcd` forks (no upstream PRs yet). Early standalone `openshell-driver-kubevirt` POC dropped from the OpenShell branch; approach is an option on the existing Kubernetes driver + process+network sidecar runtime.
 
 **As of 2026-07-10 (cleanup) — LEAN IMAGE + NEMOCLAW BRANCH:** In-image sed/python patches removed. VM/sibling-supervisor support lives on [`shanemcd/NemoClaw` `vm-runtime-backend`](https://github.com/shanemcd/NemoClaw/tree/vm-runtime-backend) (`NEMOCLAW_VM_SIDECAR=1` / `nemoclaw-start-vm`). Bootc image is Hermes + ddgs only (no rust, build toolchain, or extra CLIs).

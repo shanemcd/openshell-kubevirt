@@ -40,8 +40,12 @@ fi
 if [ -n "${OPENSHELL_ENDPOINT:-}" ]; then
   echo "OPENSHELL_ENDPOINT=${OPENSHELL_ENDPOINT}" >>"$DROPIN_ENV"
 fi
+# Guest default entrypoint. Gateway/create may override via metadata
+# OPENSHELL_SANDBOX_COMMAND (k8s sandbox_command / create --env).
 if [ -n "${OPENSHELL_SANDBOX_COMMAND:-}" ]; then
   echo "OPENSHELL_SANDBOX_COMMAND=${OPENSHELL_SANDBOX_COMMAND}" >>"$DROPIN_ENV"
+else
+  echo "OPENSHELL_SANDBOX_COMMAND=/usr/local/bin/nemoclaw-start-vm" >>"$DROPIN_ENV"
 fi
 
 # Prefer K8s SA bootstrap (rebootstrap-capable) over a static gateway JWT.

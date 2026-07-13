@@ -36,4 +36,7 @@ if [ -n "$MODE" ]; then
   MODE_ARGS=(--mode "$MODE")
 fi
 
+# Entrypoint comes from OPENSHELL_SANDBOX_COMMAND in the drop-in (guest default
+# nemoclaw-start-vm, or gateway/create override). Do not pass argv here so an
+# explicit metadata command wins via env; empty metadata uses the guest default.
 exec /opt/openshell/bin/openshell-sandbox "${MODE_ARGS[@]}"
