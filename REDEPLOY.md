@@ -16,10 +16,12 @@ unset OPENSHELL_GATEWAY_ENDPOINT
 | `ghcr.io/shanemcd/agent-sandbox-controller:nightly` | Deploy `agent-sandbox-system/agent-sandbox-controller` |
 | `ghcr.io/shanemcd/openshell-gateway:nightly` | STS `openshell/openshell` |
 | `ghcr.io/shanemcd/openshell-supervisor:nightly` | Intermediate only (baked into bootc) |
-| `ghcr.io/shanemcd/nemoclaw-hermes:kubevirt` | Intermediate only (baked into bootc) |
-| `ghcr.io/shanemcd/hermes-sandbox-bootc:nightly` | Intermediate bootc OS image (input to containerDisk) |
-| `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | Sandbox `containers[0].image` (KubeVirt containerDisk) |
-| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site containerDisk (toolbox layers on public bootc) |
+| `ghcr.io/shanemcd/nemoclaw-hermes:nightly` | Intermediate only (baked into nemoclaw bootc) |
+| `ghcr.io/shanemcd/hermes-sandbox-bootc:nightly` | NemoClaw variant OS image (input to containerDisk + site) |
+| `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | Default Sandbox `containers[0].image` (nemoclaw containerDisk) |
+| `ghcr.io/shanemcd/hermes-minimal-bootc:nightly` | Hermes-minimal OS image (no NemoClaw) |
+| `ghcr.io/shanemcd/hermes-minimal-kubevirt:nightly` | Optional Sandbox image (minimal containerDisk) |
+| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site containerDisk (toolbox layers on nemoclaw bootc) |
 
 Tags also include `YYYYMMDD` and `sha-<short>`. Prefer **digest** pins over moving tags.
 
@@ -62,14 +64,18 @@ Nightly publishes:
 
 | Image | Use |
 |-------|-----|
-| `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | Public lean guest (bootc → qcow2 containerDisk) |
-| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site layers (`jirahhh`, `gh`, guest docs) on that base |
+| `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | NemoClaw guest (default / site base) |
+| `ghcr.io/shanemcd/hermes-minimal-kubevirt:nightly` | Hermes-minimal guest (no config seals / MCP integrity) |
+| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site layers (`jirahhh`, `gh`, guest docs) on nemoclaw bootc |
 
 ```bash
 DISK_DIG=$(crane digest ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly)
+# or minimal:
+# DISK_DIG=$(crane digest ghcr.io/shanemcd/hermes-minimal-kubevirt:nightly)
 # or site:
 # DISK_DIG=$(crane digest ghcr.io/shanemcd/hermes-site-kubevirt:nightly)
 IMAGE="ghcr.io/shanemcd/hermes-sandbox-kubevirt@${DISK_DIG}"
+# IMAGE="ghcr.io/shanemcd/hermes-minimal-kubevirt@${DISK_DIG}"
 ```
 
 Optional Quay mirror:
@@ -134,8 +140,8 @@ Verify after SSH is up:
 oc -n "$NS" get pvc workspace-hermes -o jsonpath='uid={.metadata.uid} created={.metadata.creationTimestamp}{"\n"}'
 
 # Guest rootfs is the new image; /sandbox is still the PVC
-virtctl ssh root@vmi/"$NAME"/"$NS" -i ~/.ssh/id_rsa \
-  --local-ssh-opts=-oStrictHostKeyChecking=no \
+virtctl ssh root@vmi/"$NAME" -n "$NS" -i ~/.ssh/id_rsa \
+  --local-ssh-opts="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null" \
   --command='findmnt -n /sandbox; bootc status 2>/dev/null | head -20'
 ```
 
@@ -180,25 +186,40 @@ Default is **combined** (`network,process`). To run Hermes as a sibling without 
 openshell sandbox create ... --env "SUPERVISOR_MODE=network"
 
 # Or on a live guest (root), after the mode scripts are baked/copied in:
-virtctl ssh root@vmi/hermes -n default --local-ssh-opts='-oStrictHostKeyChecking=no' \
+virtctl ssh root@vmi/hermes -n default -i ~/.ssh/id_rsa \
+  --local-ssh-opts="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null" \
   --command='openshell-supervisor-mode network'   # or: combined
 ```
 
 Do **not** set `SUPERVISOR_MODE=network` without `sandbox-workload` — Hermes will not start and `exec` will hang.
+
+Guest entrypoint is `/usr/local/bin/sandbox-entrypoint` (symlink to `nemoclaw-start-vm` or `hermes-start.sh` depending on the image). Gateway `sandbox_command` / create `--env OPENSHELL_SANDBOX_COMMAND=…` can override; prefer leaving it empty so the image owns the default.
 
 ## 4. Smoke
 
 ```bash
 openshell gateway info
 openshell sandbox list
-openshell sandbox exec whoami   # expect: sandbox
 openshell sandbox provider list hermes   # expect: github, slack, vertex-prod, atlassian
+```
+
+`openshell sandbox exec` only works when the supervisor runs in **combined** mode (`--mode network,process`). In **network-only** mode the supervisor does not proxy process execution, so use `virtctl ssh` instead:
+
+```bash
+# combined mode:
+openshell sandbox exec whoami   # expect: sandbox
+
+# network-only mode:
+virtctl ssh root@vmi/hermes -n default -i ~/.ssh/id_rsa \
+  --local-ssh-opts="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null" \
+  --command='whoami'   # expect: root
 ```
 
 Also confirm Slack / Signal / inference after an in-place disk restart or recreate.
 
 ## Notes
 
+- The VM generates a new SSH host key on every restart, so `known_hosts` entries go stale. Always pass `-oUserKnownHostsFile=/dev/null` (alongside `-oStrictHostKeyChecking=no`) to `virtctl ssh` to avoid "REMOTE HOST IDENTIFICATION HAS CHANGED" errors.
 - Nightly **gateway** is distroless (zigbuild + `bundled-z3`). Live CRC previously used a Fedora 44 wrapper for toolbox builds; distroless is the intended cluster image. If the STS fails after switch, mirror/binary-wrap as before.
 - Do not use local `tot` quadlets or `OPENSHELL_GATEWAY_ENDPOINT` for CRC Hermes work.
 - Tag-only `rollout restart` can leave pods on an old digest; always set the image to a digest (or a fresh ImageStream digest).

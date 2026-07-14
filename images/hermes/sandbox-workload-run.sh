@@ -2,7 +2,8 @@
 # Hermes workload for SUPERVISOR_MODE=network (sibling of openshell-sandbox).
 # Enters the sandbox netns, registers entrypoint.pid (when supported), sources
 # provider.env if present, points TLS/proxy at the OpenShell L7 proxy, then
-# execs nemoclaw-start-vm.
+# execs sandbox-entrypoint (or OPENSHELL_SANDBOX_COMMAND override).
+# Variant images symlink sandbox-entrypoint → nemoclaw-start-vm or hermes-start.sh.
 set -euo pipefail
 
 NETNS_FILE="${OPENSHELL_NETNS_FILE:-/run/openshell/netns}"
@@ -10,7 +11,7 @@ PROVIDER_ENV="${OPENSHELL_PROVIDER_ENV:-/run/openshell/provider.env}"
 ENTRYPOINT_PID="${OPENSHELL_ENTRYPOINT_PID:-/run/openshell/entrypoint.pid}"
 PROXY_HOST="${NEMOCLAW_PROXY_HOST:-10.200.0.1}"
 PROXY_PORT="${NEMOCLAW_PROXY_PORT:-3128}"
-COMMAND="${OPENSHELL_SANDBOX_COMMAND:-/usr/local/bin/nemoclaw-start-vm}"
+COMMAND="${OPENSHELL_SANDBOX_COMMAND:-/usr/local/bin/sandbox-entrypoint}"
 SANDBOX_UID="${OPENSHELL_SANDBOX_UID:-10001}"
 SANDBOX_GID="${OPENSHELL_SANDBOX_GID:-10001}"
 
@@ -67,6 +68,7 @@ if [ "${SANDBOX_WORKLOAD_IN_NETNS:-}" = "1" ]; then
   # Linger (baked at /var/lib/systemd/linger/sandbox) starts user@UID so the
   # session bus exists; point DBUS at it for systemd cgroup manager.
   export HOME="${HOME:-/sandbox}"
+  export HERMES_HOME="${HERMES_HOME:-/sandbox/.hermes}"
   export USER=sandbox
   export LOGNAME=sandbox
   export XDG_RUNTIME_DIR="/run/user/${SANDBOX_UID}"

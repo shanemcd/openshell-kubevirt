@@ -1,0 +1,200 @@
+## Variant: hermes-minimal — Hermes from NousResearch tarball (no NemoClaw).
+## GHCR: hermes-minimal-bootc / hermes-minimal-kubevirt.
+## Build with OpenShell's docker-build-image.sh supervisor, then tag locally, e.g.:
+##   podman tag openshell/supervisor:dev localhost/openshell-supervisor:kubevirt
+## ARG that feeds FROM must be declared before any FROM.
+## Context: openshell-kubevirt/images/hermes/ (this file's directory).
+##
+## No nemoclaw-start, config seals, or MCP integrity guards. OpenShell still
+## owns network-only sandboxing via openshell-sandbox + sandbox-workload.
+ARG OPENSHELL_SUPERVISOR_IMAGE=localhost/openshell-supervisor:kubevirt
+# Calver tag / pins — keep in sync with NVIDIA/NemoClaw agents/hermes/Dockerfile.base
+# when bumping Hermes (scripts/update-hermes-agent.sh there is the upstream source).
+ARG HERMES_VERSION=v2026.7.1
+ARG HERMES_SEMVER=0.18.0
+ARG HERMES_TARBALL_SHA256=ec8a380629cc2f3f2102dd92cad50c4ded706fe59c0e359a05681166a0ae2991
+ARG HERMES_UV_EXTRAS="anthropic messaging web pty mcp"
+ARG UV_VERSION=0.11.8
+
+## Stage 1: supervisor binary source for COPY --from
+FROM ${OPENSHELL_SUPERVISOR_IMAGE} AS openshell-supervisor
+
+## Stage 2: build Hermes on a normal Fedora rootfs.
+## fedora-bootc has /root -> var/roothome (broken during container build), so
+## npm/uv must not run there. Copy the finished tree into the bootc stage.
+FROM quay.io/fedora/fedora:44 AS hermes-build
+
+ARG HERMES_VERSION
+ARG HERMES_SEMVER
+ARG HERMES_TARBALL_SHA256
+ARG HERMES_UV_EXTRAS
+ARG UV_VERSION
+
+RUN dnf install -y \
+      git wget curl ca-certificates \
+      python3.13 python3.13-devel python3-pip \
+      nodejs npm \
+      gcc gcc-c++ make \
+      which findutils tar gzip \
+    && python3.13 -m ensurepip \
+    && dnf clean all
+
+RUN python3.13 -m pip install --no-cache-dir --break-system-packages "uv==${UV_VERSION}"
+RUN mkdir -p /opt/hermes \
+    && curl -fsSL "https://github.com/NousResearch/hermes-agent/archive/refs/tags/${HERMES_VERSION}.tar.gz" \
+         -o /tmp/hermes.tar.gz \
+    && printf '%s  /tmp/hermes.tar.gz\n' "${HERMES_TARBALL_SHA256}" > /tmp/hermes.tar.gz.sha256 \
+    && sha256sum -c /tmp/hermes.tar.gz.sha256 \
+    && tar -xzf /tmp/hermes.tar.gz -C /opt/hermes --strip-components=1 \
+    && rm -f /tmp/hermes.tar.gz /tmp/hermes.tar.gz.sha256 \
+    && tarball_semver=$(sed -n 's/^version = "\(.*\)"/\1/p' /opt/hermes/pyproject.toml | head -1) \
+    && test "$tarball_semver" = "${HERMES_SEMVER}"
+
+WORKDIR /opt/hermes
+# shellcheck disable=SC2086
+RUN set -eu; \
+    set --; \
+    for extra in ${HERMES_UV_EXTRAS}; do \
+        set -- "$@" --extra "$extra"; \
+    done; \
+    uv sync --frozen --no-dev "$@" --no-cache \
+    && npm ci --prefer-offline --no-audit --no-fund \
+    && for ui_dir in ui-tui web; do \
+        if [ -f "${ui_dir}/package-lock.json" ]; then \
+            npm ci --prefix "${ui_dir}" --prefer-offline --no-audit --no-fund; \
+            npm run build --prefix "${ui_dir}"; \
+        elif [ -f "${ui_dir}/package.json" ] && grep -q "\"${ui_dir}\"" package-lock.json; then \
+            npm run build --workspace "${ui_dir}"; \
+        else \
+            echo "Skipping optional Hermes UI package ${ui_dir}"; \
+        fi; \
+    done \
+    && npm ci --omit=dev --prefer-offline --no-audit --no-fund \
+    && rm -rf ui-tui/node_modules web/node_modules /tmp/camoufox-* \
+    && ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python \
+    && ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python3 \
+    && ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python3.13 \
+    && /opt/hermes/.venv/bin/hermes --version
+
+# Hermes-specific packages (ddgs web backend)
+RUN python3.13 -m pip install --target=/opt/hermes/.venv/lib/python3.13/site-packages ddgs
+
+## Stage 3: bootc VM image
+FROM quay.io/fedora/fedora-bootc:44
+
+# ── OpenShell sandbox supervisor (from supervisor container image) ────
+COPY --from=openshell-supervisor /openshell-sandbox /opt/openshell/bin/openshell-sandbox
+RUN chmod 755 /opt/openshell/bin/openshell-sandbox && \
+    ln -s /opt/openshell/bin/openshell-sandbox /openshell-sandbox && \
+    mkdir -p /etc/openshell /etc/openshell-tls/client /sandbox /opt/data
+
+# ── System users ──────────────────────────────────────────────────────
+RUN groupadd -g 10001 sandbox || true && \
+    useradd -u 10001 -g 10001 -m -d /sandbox -s /bin/bash sandbox || true && \
+    # Linger so user@10001 (session bus + /run/user/10001) starts at boot for
+    # rootless podman systemd cgroup manager — without a login session.
+    mkdir -p /var/lib/systemd/linger && touch /var/lib/systemd/linger/sandbox
+
+# ── SSH + qemu-guest-agent (day-2 root via KubeVirt accessCredentials) ─
+# Metadata arrives via virtio disks, not cloud-init. Guest agent is required
+# for virtctl credentials add-ssh-key / dynamic authorized_keys for root.
+RUN dnf install -y openssh-server openssh-clients cloud-utils-growpart \
+      qemu-guest-agent && \
+    ssh-keygen -A && \
+    echo 'sandbox:sandbox' | chpasswd && \
+    printf '%s\n' \
+      'PasswordAuthentication yes' \
+      'PermitRootLogin prohibit-password' \
+      'PubkeyAuthentication yes' \
+      > /etc/ssh/sshd_config.d/90-sandbox.conf && \
+    systemctl enable sshd qemu-guest-agent && \
+    systemctl mask cloud-init-local.service cloud-init-main.service \
+      cloud-config.service cloud-final.service 2>/dev/null || true && \
+    (command -v setsebool >/dev/null && setsebool -P virt_qemu_ga_manage_ssh on || true)
+
+# ── Runtime deps for Hermes + OpenShell guest helpers ─────────────────
+RUN dnf install -y \
+      git wget curl ca-certificates \
+      python3.13 python3-pip python3-pyyaml \
+      pandoc \
+      podman \
+      nodejs \
+      iproute util-linux procps-ng socat jq \
+      which findutils tar gzip && \
+    dnf clean all
+
+# ── Hermes Agent (from hermes-build; no NemoClaw) ─────────────────────
+COPY --from=hermes-build /opt/hermes /opt/hermes
+RUN ln -sf /opt/hermes/.venv/bin/hermes /usr/local/bin/hermes \
+    && ln -sf /opt/hermes/.venv/bin/hermes-agent /usr/local/bin/hermes-agent \
+    && ln -sf /opt/hermes/.venv/bin/hermes-acp /usr/local/bin/hermes-acp \
+    && /usr/local/bin/hermes --version
+
+ENV PATH="/usr/local/bin:/opt/hermes/.venv/bin:${PATH}" \
+    HERMES_TUI_DIR="/opt/hermes/ui-tui" \
+    HERMES_WEB_DIST="/opt/hermes/hermes_cli/web_dist"
+
+COPY extra-ca-certs.pem /tmp/extra-ca-certs.pem
+RUN cat /tmp/extra-ca-certs.pem >> /etc/pki/tls/certs/ca-bundle.crt && \
+    rm /tmp/extra-ca-certs.pem
+
+# ── Hermes home (mutable; no NemoClaw seals / config-hash) ─────────────
+RUN mkdir -p \
+      /sandbox/.hermes/memories \
+      /sandbox/.hermes/sessions \
+      /sandbox/.hermes/skills \
+      /sandbox/.hermes/plugins \
+      /sandbox/.hermes/cron \
+      /sandbox/.hermes/logs \
+      /sandbox/.hermes/skins \
+      /sandbox/.hermes/plans \
+      /sandbox/.hermes/workspace \
+      /sandbox/.hermes/profiles \
+      /sandbox/.hermes/cache \
+      /sandbox/.hermes/hooks \
+      /sandbox/.hermes/image_cache \
+      /sandbox/.hermes/audio_cache \
+      /sandbox/.hermes/pairing \
+      /sandbox/.hermes/platforms \
+      /sandbox/.hermes/runtime \
+      /sandbox/.hermes/mcp-tokens \
+    && printf '%s\n' '{}' > /sandbox/.hermes/config.yaml \
+    && : > /sandbox/.hermes/.env \
+    && chown -R sandbox:sandbox /sandbox \
+    && chmod 1775 /sandbox /sandbox/.hermes
+
+COPY SOUL.md /sandbox/.hermes/SOUL.md
+COPY hermes.env /tmp/hermes.env
+COPY hermes-config.py /tmp/hermes-config.py
+COPY hermes-start.sh /usr/local/bin/hermes-start.sh
+RUN chmod 755 /usr/local/bin/hermes-start.sh && \
+    ln -sf /usr/local/bin/hermes-start.sh /usr/local/bin/sandbox-entrypoint && \
+    python3 /tmp/hermes-config.py && \
+    cat /tmp/hermes.env >> /sandbox/.hermes/.env && \
+    chown -R sandbox:sandbox /sandbox/.hermes && \
+    chmod 644 /sandbox/.hermes/config.yaml /sandbox/.hermes/SOUL.md && \
+    chmod 640 /sandbox/.hermes/.env && \
+    rm -f /tmp/hermes.env /tmp/hermes-config.py
+
+# ── Guest bootstrap (image-owned; mounts virtio-sandboxmeta + volumes.json disks) ─
+RUN mkdir -p /usr/local/lib/openshell /usr/local/sbin /etc/sandbox /etc/sysctl.d
+COPY prepare-sandbox-volumes.sh /usr/local/lib/openshell/prepare-sandbox-volumes.sh
+COPY openshell-sandbox-prep-env.sh /usr/local/lib/openshell/openshell-sandbox-prep-env.sh
+COPY openshell-sandbox-run.sh /usr/local/lib/openshell/openshell-sandbox-run.sh
+COPY sandbox-workload-run.sh /usr/local/lib/openshell/sandbox-workload-run.sh
+COPY openshell-supervisor-mode.sh /usr/local/lib/openshell/openshell-supervisor-mode
+COPY sandbox-volumes.service /etc/systemd/system/sandbox-volumes.service
+COPY openshell-sandbox.service /etc/systemd/system/openshell-sandbox.service
+COPY sandbox-workload.service /etc/systemd/system/sandbox-workload.service
+COPY 99-openshell-quiet-console.conf /etc/sysctl.d/99-openshell-quiet-console.conf
+RUN chmod 755 /usr/local/lib/openshell/prepare-sandbox-volumes.sh \
+      /usr/local/lib/openshell/openshell-sandbox-prep-env.sh \
+      /usr/local/lib/openshell/openshell-sandbox-run.sh \
+      /usr/local/lib/openshell/sandbox-workload-run.sh \
+      /usr/local/lib/openshell/openshell-supervisor-mode && \
+    ln -sf /usr/local/lib/openshell/openshell-supervisor-mode /usr/local/sbin/openshell-supervisor-mode && \
+    systemctl enable sandbox-volumes.service openshell-sandbox.service \
+      sandbox-workload.service
+# /etc/sandbox/{env,volumes.json} come from the sandboxmeta virtio disk at boot.
+# sandbox-workload is WantedBy=openshell-sandbox; the want-workload gate is set
+# in ExecStartPre so After= + ConditionPathExists do not race Type=simple.

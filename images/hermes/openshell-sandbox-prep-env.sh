@@ -52,7 +52,7 @@ fi
 if [ -n "${OPENSHELL_SANDBOX_COMMAND:-}" ]; then
   echo "OPENSHELL_SANDBOX_COMMAND=${OPENSHELL_SANDBOX_COMMAND}" >>"$DROPIN_ENV"
 else
-  echo "OPENSHELL_SANDBOX_COMMAND=/usr/local/bin/nemoclaw-start-vm" >>"$DROPIN_ENV"
+  echo "OPENSHELL_SANDBOX_COMMAND=/usr/local/bin/sandbox-entrypoint" >>"$DROPIN_ENV"
 fi
 
 # Prefer K8s SA bootstrap (rebootstrap-capable) over a static gateway JWT.

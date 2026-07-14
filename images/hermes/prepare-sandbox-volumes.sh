@@ -251,6 +251,7 @@ fi
 # Layout only — do not seal trust anchors here. OpenShell's prepare_filesystem
 # recursively chowns /sandbox, drops to sandbox, then Landlock + exec
 # (same as the Pod path; no OPENSHELL_DEFER_PRIVILEGE_DROP).
+# Network-only: sandbox-workload drops to sandbox after nsenter.
 chown root:sandbox /sandbox 2>/dev/null || true
 chmod 1775 /sandbox 2>/dev/null || true
 if [ -d /sandbox/.hermes ]; then

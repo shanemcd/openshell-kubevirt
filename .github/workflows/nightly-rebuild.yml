@@ -14,15 +14,19 @@ on:
         type: boolean
         default: true
       build_container_disk:
-        description: Convert hermes-sandbox-bootc to hermes-sandbox-kubevirt containerDisk
+        description: Convert hermes-sandbox-bootc + hermes-minimal-bootc to containerDisk images
         type: boolean
         default: true
       build_hermes:
-        description: Rebuild hermes-sandbox-bootc from hermes/ in this repo (uses existing GHCR supervisor/nemoclaw)
+        description: Rebuild hermes-sandbox-bootc (nemoclaw variant; uses GHCR supervisor + nemoclaw-hermes)
+        type: boolean
+        default: false
+      build_hermes_minimal:
+        description: Rebuild hermes-minimal-bootc (no NemoClaw; uses GHCR supervisor)
         type: boolean
         default: false
       build_site_hermes:
-        description: Layer toolbox openshell-kubevirt/ onto bootc → hermes-site-bootc + hermes-site-kubevirt
+        description: Layer toolbox openshell-kubevirt/ onto nemoclaw bootc → hermes-site-bootc + hermes-site-kubevirt
         type: boolean
         default: true
 
@@ -46,6 +50,7 @@ jobs:
       push_images: ${{ steps.meta.outputs.push_images }}
       build_container_disk: ${{ steps.meta.outputs.build_container_disk }}
       build_hermes: ${{ steps.meta.outputs.build_hermes }}
+      build_hermes_minimal: ${{ steps.meta.outputs.build_hermes_minimal }}
       build_site_hermes: ${{ steps.meta.outputs.build_site_hermes }}
     steps:
       - id: meta
@@ -57,12 +62,14 @@ jobs:
             echo "push_images=${{ inputs.push_images }}" >> "$GITHUB_OUTPUT"
             echo "build_container_disk=${{ inputs.build_container_disk }}" >> "$GITHUB_OUTPUT"
             echo "build_hermes=${{ inputs.build_hermes }}" >> "$GITHUB_OUTPUT"
+            echo "build_hermes_minimal=${{ inputs.build_hermes_minimal }}" >> "$GITHUB_OUTPUT"
             echo "build_site_hermes=${{ inputs.build_site_hermes }}" >> "$GITHUB_OUTPUT"
           else
             echo "rebase=true" >> "$GITHUB_OUTPUT"
             echo "push_images=true" >> "$GITHUB_OUTPUT"
             echo "build_container_disk=true" >> "$GITHUB_OUTPUT"
             echo "build_hermes=false" >> "$GITHUB_OUTPUT"
+            echo "build_hermes_minimal=false" >> "$GITHUB_OUTPUT"
             echo "build_site_hermes=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -430,7 +437,7 @@ jobs:
 
   build-hermes-bootc:
     needs: [meta, rebases, build-openshell-supervisor, build-nemoclaw-hermes]
-    # Rebuild when push_images (after deps) or when build_hermes alone (reuse GHCR :nightly deps).
+    # NemoClaw variant → hermes-sandbox-bootc (site base + default guest).
     if: |
       always() &&
       !cancelled() &&
@@ -445,11 +452,11 @@ jobs:
         needs.meta.outputs.build_hermes != 'true'
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Use existing hermes-sandbox-bootc:nightly
         if: needs.meta.outputs.push_images != 'true' && needs.meta.outputs.build_hermes != 'true'
-        run: echo "Skipping bootc rebuild; containerDisk will pull existing :nightly"
+        run: echo "Skipping nemoclaw bootc rebuild; containerDisk will pull existing :nightly"
 
       - uses: actions/checkout@v4
         if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes == 'true'
@@ -464,14 +471,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare context and build hermes-sandbox-bootc
+      - name: Prepare context and build hermes-sandbox-bootc (nemoclaw)
         if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes == 'true'
         env:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
           SHORT=$(git rev-parse --short HEAD)
-          CTX=hermes
+          CTX=images/hermes
           cd "$CTX"
 
           # Gitignored locally; CI uses the example + empty CA bundle.
@@ -480,7 +487,7 @@ jobs:
 
           # Containerfile hardcodes localhost for nemoclaw; rewrite for GHCR/buildx.
           sed -i "s|FROM localhost/nemoclaw-hermes:kubevirt|FROM ${REGISTRY}/nemoclaw-hermes:nightly|" \
-            Containerfile.kubevirt
+            Containerfile.nemoclaw
 
           IMAGE="${REGISTRY}/hermes-sandbox-bootc"
           docker buildx build \
@@ -490,7 +497,66 @@ jobs:
             -t "${IMAGE}:nightly" \
             -t "${IMAGE}:${DATE}" \
             -t "${IMAGE}:sha-${SHORT}" \
-            -f Containerfile.kubevirt \
+            -f Containerfile.nemoclaw \
+            .
+
+  build-hermes-minimal-bootc:
+    needs: [meta, rebases, build-openshell-supervisor]
+    # Hermes-minimal variant → hermes-minimal-bootc (no NemoClaw).
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.meta.result == 'success' &&
+      needs.rebases.result == 'success' &&
+      (
+        needs.meta.outputs.build_hermes_minimal == 'true' ||
+        needs.meta.outputs.push_images == 'true' &&
+        needs.build-openshell-supervisor.result == 'success' ||
+        needs.meta.outputs.push_images != 'true' &&
+        needs.meta.outputs.build_hermes_minimal != 'true'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Use existing hermes-minimal-bootc:nightly
+        if: needs.meta.outputs.push_images != 'true' && needs.meta.outputs.build_hermes_minimal != 'true'
+        run: echo "Skipping minimal bootc rebuild; containerDisk will pull existing :nightly"
+
+      - uses: actions/checkout@v4
+        if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes_minimal == 'true'
+
+      - uses: docker/setup-buildx-action@v3
+        if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes_minimal == 'true'
+
+      - uses: docker/login-action@v3
+        if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes_minimal == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare context and build hermes-minimal-bootc
+        if: needs.meta.outputs.push_images == 'true' || needs.meta.outputs.build_hermes_minimal == 'true'
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          SHORT=$(git rev-parse --short HEAD)
+          CTX=images/hermes
+          cd "$CTX"
+
+          cp -f hermes.env.example hermes.env
+          : > extra-ca-certs.pem
+
+          IMAGE="${REGISTRY}/hermes-minimal-bootc"
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            --build-arg "OPENSHELL_SUPERVISOR_IMAGE=${REGISTRY}/openshell-supervisor:nightly" \
+            -t "${IMAGE}:nightly" \
+            -t "${IMAGE}:${DATE}" \
+            -t "${IMAGE}:sha-${SHORT}" \
+            -f Containerfile.minimal \
             .
 
   build-hermes-containerdisk:
@@ -555,6 +621,75 @@ jobs:
           printf 'FROM scratch\nCOPY disk/fedora.qcow2 /disk/fedora.qcow2\n' > "$PKG/Dockerfile"
 
           IMAGE="${REGISTRY}/hermes-sandbox-kubevirt"
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            -t "${IMAGE}:nightly" \
+            -t "${IMAGE}:${DATE}" \
+            -t "${IMAGE}:sha-${SHORT}" \
+            "$PKG"
+
+  build-hermes-minimal-containerdisk:
+    needs: [meta, build-hermes-minimal-bootc]
+    if: |
+      always() &&
+      !cancelled() &&
+      needs.meta.outputs.build_container_disk == 'true' &&
+      needs.build-hermes-minimal-bootc.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login rootful podman to GHCR
+        run: |
+          set -euo pipefail
+          echo "USER_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "USER_GID=$(id -g)" >> "$GITHUB_ENV"
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io \
+            -u "${{ github.actor }}" --password-stdin
+
+      - name: Build qcow2 with bootc-image-builder
+        id: bib
+        uses: osbuild/bootc-image-builder-action@v0.0.2
+        with:
+          config-file: .github/bib-qcow2.toml
+          image: ${{ env.REGISTRY }}/hermes-minimal-bootc:nightly
+          types: qcow2
+          rootfs: ext4
+          chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
+          additional-args: --use-librepo=True
+
+      - name: Package and push hermes-minimal-kubevirt
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+          QCOW2: ${{ steps.bib.outputs.qcow2-output-path }}
+        run: |
+          set -euo pipefail
+          test -n "$QCOW2"
+          test -f "$QCOW2"
+
+          DIGEST=$(docker buildx imagetools inspect \
+            "${REGISTRY}/hermes-minimal-bootc:nightly" \
+            | awk '/^Digest:/ { print $2; exit }')
+          test -n "$DIGEST"
+          SHORT="${DIGEST#sha256:}"
+          SHORT="${SHORT:0:12}"
+
+          PKG=$(mktemp -d)
+          mkdir -p "$PKG/disk"
+          cp "$QCOW2" "$PKG/disk/fedora.qcow2"
+          printf 'FROM scratch\nCOPY disk/fedora.qcow2 /disk/fedora.qcow2\n' > "$PKG/Dockerfile"
+
+          IMAGE="${REGISTRY}/hermes-minimal-kubevirt"
           docker buildx build \
             --platform=linux/amd64 \
             --push \

@@ -1,8 +1,9 @@
-## OpenShell supervisor image (scratch + /openshell-sandbox).
+## Variant: nemoclaw — Hermes via NemoClaw (config seals, MCP integrity, nemoclaw-start).
+## GHCR: hermes-sandbox-bootc / hermes-sandbox-kubevirt (default / site base).
 ## Build with OpenShell's docker-build-image.sh supervisor, then tag locally, e.g.:
 ##   podman tag openshell/supervisor:dev localhost/openshell-supervisor:kubevirt
 ## ARG that feeds FROM must be declared before any FROM.
-## Context: openshell-kubevirt/hermes/ (this file's directory).
+## Context: openshell-kubevirt/images/hermes/ (this file's directory).
 ARG OPENSHELL_SUPERVISOR_IMAGE=localhost/openshell-supervisor:kubevirt
 
 ## Stage 1: NemoClaw Hermes built from shanemcd/NemoClaw kubevirt-sidecar.
@@ -72,7 +73,8 @@ RUN ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python && \
     ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python3 && \
     ln -sf /usr/bin/python3.13 /opt/hermes/.venv/bin/python3.13 && \
     chmod 755 /usr/local/bin/nemoclaw-start /usr/local/bin/nemoclaw-start-vm \
-      /usr/local/bin/nemoclaw-gateway-control
+      /usr/local/bin/nemoclaw-gateway-control && \
+    ln -sf /usr/local/bin/nemoclaw-start-vm /usr/local/bin/sandbox-entrypoint
 
 # ── Hermes-specific packages (ddgs only) ──────────────────────────────
 RUN python3.13 -m pip install --target=/opt/hermes/.venv/lib/python3.13/site-packages ddgs

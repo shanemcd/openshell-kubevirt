@@ -3,5 +3,5 @@ hermes.env
 extra-ca-certs.pem
 
 # Supervisor comes from an OpenShell supervisor *image* via COPY --from
-# (see Containerfile.kubevirt). Do not stage a raw binary here.
+# (see Containerfile.nemoclaw / Containerfile.minimal). Do not stage a raw binary here.
 openshell-sandbox

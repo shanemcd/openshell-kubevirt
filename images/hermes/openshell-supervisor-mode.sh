@@ -130,4 +130,4 @@ fi
 
 echo "mode=$(current_mode)"
 pgrep -af '/opt/openshell/bin/openshell-sandbox' || true
-pgrep -af 'nemoclaw-start|hermes gateway' || true
+pgrep -af 'hermes-start|hermes gateway' || true

@@ -46,7 +46,7 @@ Local clones (paths are machine-local; remotes matter more than layout):
 | `/etc/sandbox/volumes.json` | PVC entries `{name,serial,mountPath,source:persistentVolumeClaim,claimName}` + Secret disks `{…,source:secret,secretName}`. **Metadata disk itself is not listed.** |
 | Secret `volumeMount`s (first container) | Extra Secret virtio disks (serial = sanitized volume name); guest mounts via `/dev/disk/by-id/virtio-*` and copies TLS → `/etc/openshell-tls/client` |
 
-Bootc image ([`hermes/Containerfile.kubevirt`](./hermes/Containerfile.kubevirt)) owns: `sandbox-volumes.service` (after `local-fs`, **not** `cloud-final`), `openshell-sandbox.service`, `prepare-sandbox-volumes.sh`, `openshell-sandbox-prep-env.sh`, qemu-guest-agent, Hermes seals, supervisor binary. Cloud-init is masked in the image.
+Bootc image ([`images/hermes/Containerfile.nemoclaw`](./images/hermes/Containerfile.nemoclaw) / [`images/hermes/Containerfile.minimal`](./images/hermes/Containerfile.minimal)) owns: `sandbox-volumes.service` (after `local-fs`, **not** `cloud-final`), `openshell-sandbox.service`, `prepare-sandbox-volumes.sh`, `openshell-sandbox-prep-env.sh`, qemu-guest-agent, supervisor binary. Cloud-init is masked in the image. Nemoclaw variant also bakes Hermes seals; minimal does not.
 
 ### What works on CRC right now
 
@@ -54,7 +54,7 @@ Bootc image ([`hermes/Containerfile.kubevirt`](./hermes/Containerfile.kubevirt))
 |-------|--------|
 | CRC OpenShift | Up; `oc` as `kubeadmin` via `~/.crc/machines/crc/kubeconfig` |
 | Gateway `openshell-0` | **Ready 1/1** (Fedora 44 image; pin STS to **digest**, not tag alone) |
-| Gateway config | `sandbox_namespace = "default"`, `runtime_backend = "VirtualMachine"`, `sandbox_command = "/usr/local/bin/nemoclaw-start-vm"`, `workspace_persistence = true`, `client_tls_secret_name = "openshell-client-tls"` |
+| Gateway config | `sandbox_namespace = "default"`, `runtime_backend = "VirtualMachine"`, `sandbox_command` empty or `/usr/local/bin/sandbox-entrypoint` (image owns nemoclaw-start-vm vs hermes-start.sh), `workspace_persistence = true`, `client_tls_secret_name = "openshell-client-tls"` |
 | Route (prefer this) | `openshell-openshell.apps-crc.testing` → svc `openshell:grpc` (**TLS passthrough**). CLI gateway `crc` already points here with mTLS. **Do not use `oc port-forward` for normal work.** |
 | agent-sandbox controller | Virtio Secret metadata + optional kubevirt RBAC on fork. **Pin deploy image to digest** (`istag …:kubevirt`). After redeploy with the RBAC split, apply `k8s/kubevirt*.yaml` or `--kubevirt` / `KUBEVIRT=true`. |
 | OpenShell k8s driver (in gateway) | VM path emits TLS Secret volume/mount + `OPENSHELL_TLS_{CA,CERT,KEY}` path env (same as pods); workspace VCT when persistence enabled |
@@ -132,15 +132,17 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 
 **As of 2026-07-10 (evening) — BAKE COMPLETE:** Initial two-service sidecar topology verified (Slack Socket Mode + Vertex inference). Primary contact channel is **Slack**. Discord disabled in image. Signal deferred (SSRF).
 
-**As of 2026-07-13 — DUAL SUPERVISOR MODES:** Guest supports runtime switch between **combined** (`network,process`, default) and **network** (`--mode network` + `sandbox-workload` sibling). Use `openshell-supervisor-mode {combined|network}` on the guest, or `SUPERVISOR_MODE=network` at create. See [`hermes/README.md`](./hermes/README.md).
+**As of 2026-07-13 — DUAL SUPERVISOR MODES:** Guest supports runtime switch between **combined** (`network,process`, default) and **network** (`--mode network` + `sandbox-workload` sibling). Use `openshell-supervisor-mode {combined|network}` on the guest, or `SUPERVISOR_MODE=network` at create. See [`images/hermes/README.md`](./images/hermes/README.md).
 
 **As of 2026-07-10 (process mode) — SINGLE SUPERVISOR:** Hermes under `openshell-sandbox` (`--mode=network,process`). No `sandbox-workload` unit.
 
 **As of 2026-07-12 (defer privilege drop):** Tried `OPENSHELL_DEFER_PRIVILEGE_DROP=1` so NemoClaw could root-seal under the supervisor. Root+Landlock could not mint/write sandbox-owned `.env` (`ensure-api-key` EACCES) → crash loop / Provisioning.
 
-**As of 2026-07-13 (match Pod privilege drop):** Guest no longer sets `OPENSHELL_DEFER_PRIVILEGE_DROP`. OpenShell chowns `/sandbox`, drops to `sandbox`, then Landlock + exec — same as Pods. `nemoclaw-start-vm` takes the non-root path (`NEMOCLAW_CAPS_DROPPED`).
+**As of 2026-07-14 — DUAL GUEST VARIANTS:** [`images/hermes/`](./images/hermes/) builds two images from shared bootstrap scripts. **nemoclaw** (`Containerfile.nemoclaw` → `hermes-sandbox-bootc` / `hermes-sandbox-kubevirt`) keeps NemoClaw start + config seals (default + site base). **hermes-minimal** (`Containerfile.minimal` → `hermes-minimal-bootc` / `hermes-minimal-kubevirt`) installs Hermes from the pinned NousResearch tarball and starts via `hermes-start.sh` with no MCP integrity guards. Both expose `/usr/local/bin/sandbox-entrypoint`. Nightly CI builds both bootc + containerDisk images.
 
-**As of 2026-07-12 (guest default command):** `openshell-sandbox-prep-env.sh` defaults `OPENSHELL_SANDBOX_COMMAND=/usr/local/bin/nemoclaw-start-vm` when metadata omits it. Gateway `sandbox_command` / create `--env` still override. Prefer empty gateway `sandbox_command` so the image owns the entrypoint.
+**As of 2026-07-13 (match Pod privilege drop):** Guest no longer sets `OPENSHELL_DEFER_PRIVILEGE_DROP`. OpenShell chowns `/sandbox`, drops to `sandbox`, then Landlock + exec — same as Pods.
+
+**As of 2026-07-12 (guest default command):** `openshell-sandbox-prep-env.sh` defaults `OPENSHELL_SANDBOX_COMMAND=/usr/local/bin/sandbox-entrypoint` when metadata omits it. Gateway `sandbox_command` / create `--env` still override. Prefer empty gateway `sandbox_command` so the image owns the entrypoint.
 
 **As of 2026-07-10 (late) — BRANCHES ON FORKS:** Controller + OpenShell sidecar work pushed to `shanemcd` forks (no upstream PRs yet). Early standalone `openshell-driver-kubevirt` POC dropped from the OpenShell branch; approach is an option on the existing Kubernetes driver + process+network sidecar runtime.
 
@@ -167,7 +169,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 | `kubernetes-sigs/agent-sandbox` | [`kubevirt-backend`](https://github.com/shanemcd/agent-sandbox/tree/kubevirt-backend) | [compare](https://github.com/kubernetes-sigs/agent-sandbox/compare/main...shanemcd:agent-sandbox:kubevirt-backend) | `runtimeBackend: VirtualMachine`, virtio Secret metadata (`sandboxmeta` + Secret disks; no cloud-init), VCT→virtio PVC disks, optional kubevirt RBAC |
 | `NVIDIA/OpenShell` | [`vm-runtime-backend`](https://github.com/shanemcd/OpenShell/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/OpenShell/compare/main...shanemcd:OpenShell:vm-runtime-backend) | Thin VM path: `runtimeBackend` / `sandboxCommand` / `workspace_persistence`, SA Secret bootstrap, VM TLS mounts. **Archived:** [`kubevirt-sidecar`](https://github.com/shanemcd/OpenShell/tree/kubevirt-sidecar) (fat pod-sidecar + rebase pile) |
 | `NVIDIA/NemoClaw` | [`vm-runtime-backend`](https://github.com/shanemcd/NemoClaw/tree/vm-runtime-backend) | [compare](https://github.com/NVIDIA/NemoClaw/compare/main...shanemcd:NemoClaw:vm-runtime-backend) | OpenShell-supervised identity (sibling **or parent**) + `nemoclaw-start-vm` (`NEMOCLAW_VM_SIDECAR=1`). **Archived:** [`kubevirt-sidecar`](https://github.com/shanemcd/NemoClaw/tree/kubevirt-sidecar) |
-| `shanemcd/clankr` | [`main`](https://github.com/shanemcd/clankr) | — | Pod Hermes image; **bootc guest sources moved to** [`openshell-kubevirt/hermes`](./hermes/) |
+| `shanemcd/clankr` | [`main`](https://github.com/shanemcd/clankr) | — | Pod Hermes image; **bootc guest sources moved to** [`openshell-kubevirt/images/hermes`](./images/hermes/) |
 | `shanemcd/openshell-kubevirt` | [`main`](https://github.com/shanemcd/openshell-kubevirt) | — | Living handoff + iteration notes for this project |
 
 ## Bake outcomes (2026-07-10 evening → 2026-07-11 night)
@@ -177,7 +179,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 | OpenShell VM driver | Thin `vm-runtime-backend` fork branch |
 | agent-sandbox guest metadata | Virtio Secret disk `sandboxmeta` + Secret volumeMount disks; **no cloud-init userdata** |
 | agent-sandbox RBAC | Core ClusterRole Pod-only; optional `agent-sandbox-controller-kubevirt` |
-| NemoClaw VM entrypoint | `nemoclaw-start-vm` from `shanemcd/NemoClaw` `vm-runtime-backend` (no Containerfile patches) |
+| Hermes guest entrypoint | `/usr/local/bin/sandbox-entrypoint` → `nemoclaw-start-vm` (nemoclaw) or `hermes-start.sh` (minimal) |
 | clankr bootc disk | Hermes + ddgs; systemd volumes/supervisor units; Slack-only config; qemu-guest-agent |
 | Published disk | CRC IS + `quay.io/shanemcd/hermes-sandbox-kubevirt:latest` |
 | Live Hermes VM | Recreate via CLI (no TLS `--env`); Slack up; GetSandboxConfig OK; `sandbox exec` OK |
@@ -334,7 +336,7 @@ openshell inference set --gateway-endpoint http://127.0.0.1:18080 \
 
 ### Operational footgun: NemoClaw config hashes
 
-Editing `/sandbox/.hermes/config.yaml` or `.env` on the live VM **without** regenerating hashes crash-loops the workload (`Config integrity check FAILED` / `HERMES_MCP_CONFIG_DRIFT`). Use `update-config-hashes.py` (both `/sandbox/.hermes/.config-hash` and `/etc/nemoclaw/hermes.config-hash`) — format is `sha256sum` lines (`<digest>  <abs-path>`), not `config: <digest>`. Prefer baking changes into the image.
+On the **nemoclaw** guest, editing `/sandbox/.hermes/config.yaml` or MCP servers without resealing `.config-hash` crash-loops the workload. On **hermes-minimal**, config is mutable (no integrity seals); MCP OAuth state lives under `/sandbox/.hermes/mcp-tokens/` on the PVC.
 
 ### Operational footgun: kube API from Hermes (OpenShell SSRF)
 
@@ -487,7 +489,7 @@ CRDs regenerated with `make fix-go-generate` (conversion webhook via `sort-crd-v
 
 ### `shanemcd/clankr` (`main`)
 
-**[`hermes/Containerfile.kubevirt`](./hermes/Containerfile.kubevirt):** `FROM localhost/nemoclaw-hermes:kubevirt`; `COPY --from` an OpenShell **supervisor image** (`/openshell-sandbox`); Hermes + **ddgs only**; messaging platforms disabled; no rust/CLIs/patches / no checked-in supervisor binary; cloud-init masked; qemu-guest-agent enabled; `PermitRootLogin prohibit-password` (console password for `sandbox` user retained).
+**[`images/hermes/Containerfile.nemoclaw`](./images/hermes/Containerfile.nemoclaw):** `COPY --from` NemoClaw Hermes + OpenShell supervisor; Hermes seals / MCP integrity; messaging platforms per baked config. **[`images/hermes/Containerfile.minimal`](./images/hermes/Containerfile.minimal):** installs Hermes from pinned NousResearch tarball; no NemoClaw. Both: cloud-init masked; qemu-guest-agent enabled; `PermitRootLogin prohibit-password`.
 **Guest bootstrap (image-owned):** `sandbox-volumes.service` + `openshell-sandbox.service` consume virtio `sandboxmeta` + Secret/PVC disks (`prepare-sandbox-volumes.sh`). Stage iso under `/run/sandbox-disks` before copying to `/etc/sandbox` (SELinux). The controller does not write OpenShell systemd units or prepare scripts.
 **Config bake:** `hermes-config.py`, `hermes.env.example`, `SOUL.md` (agent-sandbox / OpenShell inference only).
 
@@ -505,7 +507,7 @@ CRDs regenerated with `make fix-go-generate` (conversion webhook via `sort-crd-v
 | Hermes VMI | `default` | `hermes` | Running; Slack up; workspace virtio disk present |
 | Workspace PVC | `default` | `workspace-hermes` | Bound |
 
-**In-cluster gateway config (effective):** TLS + client CA mounted; `allow_unauthenticated_users = true`; `[openshell.drivers.kubernetes]` with `runtime_backend = "VirtualMachine"`, `sandbox_command = "/usr/local/bin/nemoclaw-start-vm"`, `workspace_persistence = true`, `sandbox_namespace = "default"`. Route termination: **passthrough**.
+**In-cluster gateway config (effective):** TLS + client CA mounted; `allow_unauthenticated_users = true`; `[openshell.drivers.kubernetes]` with `runtime_backend = "VirtualMachine"`, `sandbox_command` empty or `/usr/local/bin/sandbox-entrypoint`, `workspace_persistence = true`, `sandbox_namespace = "default"`. Route termination: **passthrough**.
 
 **Helm-shaped values (reference):**
 ```
@@ -513,7 +515,7 @@ server.auth.allowUnauthenticatedUsers=true
 server.sandboxNamespace=default
 server.logLevel=debug
 server.runtimeBackend=VirtualMachine
-server.sandboxCommand=/usr/local/bin/nemoclaw-start-vm
+server.sandboxCommand=/usr/local/bin/sandbox-entrypoint
 server.workspacePersistence=true
 # TLS enabled in-cluster (passthrough Route); do not assume disableTls=true
 ```

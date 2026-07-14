@@ -2,7 +2,7 @@
 
 You run inside an OpenShell sandbox. Outbound network and which binaries may dial which hosts are enforced by **sandbox policy**. Credentials may be rewritten at the proxy; missing policy shows up as `DENIED` / `NET:FAIL` in supervisor logs, not as a normal HTTP 403 from the site.
 
-Canonical YAML for this CRC Hermes image: repo `shanemcd/openshell-kubevirt` → [`hermes/policy.yaml`](./policy.yaml).
+Canonical YAML for this CRC Hermes image: repo `shanemcd/openshell-kubevirt` → [`images/hermes/policy.yaml`](./policy.yaml).
 
 ## Who can change policy
 
@@ -107,10 +107,10 @@ Protocols: `rest` (HTTPS L7 / credential rewrite), `websocket`, or omit for coar
 
 ### B. Full replace from YAML
 
-Edit `hermes/policy.yaml` (keep existing rules; live apply cannot shrink filesystem lists), then:
+Edit `images/hermes/policy.yaml` (keep existing rules; live apply cannot shrink filesystem lists), then:
 
 ```bash
-openshell policy set hermes --policy /path/to/hermes/policy.yaml --wait
+openshell policy set hermes --policy /path/to/images/hermes/policy.yaml --wait
 ```
 
 ### C. YAML shape for a network rule
@@ -145,13 +145,13 @@ network_policies:
      openshell sandbox provider attach hermes "$p"
    done
    ```
-7. **Persist** — after a working live `policy update` / `set`, copy the same change into `hermes/policy.yaml` in git so the next recreate matches.
+7. **Persist** — after a working live `policy update` / `set`, copy the same change into `images/hermes/policy.yaml` in git so the next recreate matches.
 
 ## Workflow when you are blocked
 
 1. Reproduce once; capture `DENIED` / `NET:FAIL` lines (virtctl + `journalctl` above).
 2. Identify **host**, **port**, and **binary path**.
-3. Propose either an `openshell policy update …` command or a YAML snippet for `hermes/policy.yaml`.
+3. Propose either an `openshell policy update …` command or a YAML snippet for `images/hermes/policy.yaml`.
 4. Apply (`--wait`), retest, then remind Shane to commit the YAML if it should stick.
 
 Do not suggest opening port **6443**, PyPI/npm “just whitelist everything”, or writing tools into `/usr/local` under Landlock.

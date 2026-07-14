@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Configure Hermes settings at image build time.
 
-Modifies config.yaml directly instead of shelling out to `hermes config set`,
-which avoids issues with HOME detection. Run update-config-hashes.py after
-this to regenerate NemoClaw's integrity hashes.
+Modifies (or creates) config.yaml directly instead of shelling out to
+`hermes config set`, which avoids issues with HOME detection.
+
+NemoClaw variant: run update-config-hashes.py after this to regenerate
+integrity hashes. Hermes-minimal skips that step (mutable config).
 """
+from pathlib import Path
+
 import yaml
 
-CONFIG_PATH = "/sandbox/.hermes/config.yaml"
+CONFIG_PATH = Path("/sandbox/.hermes/config.yaml")
 
 # Hermes >=0.18 ignores model.base_url for provider: anthropic unless the host
 # looks like Anthropic/Azure/…/anthropic — inference.local fails that guard and
@@ -41,11 +45,14 @@ def deep_merge(base, override):
 
 
 def main():
-    with open(CONFIG_PATH) as f:
-        cfg = yaml.safe_load(f)
+    if CONFIG_PATH.exists():
+        with CONFIG_PATH.open() as f:
+            cfg = yaml.safe_load(f) or {}
+    else:
+        cfg = {}
 
     deep_merge(cfg, SETTINGS)
-    # VM image is Hermes + ddgs only — no remote MCP servers.
+    # Lean image default — no remote MCP servers baked in.
     cfg["mcp_servers"] = {}
     # A leftover providers/custom_providers entry named "custom" hijacks
     # resolve_runtime_provider() and ignores model.api_mode (Hermes falls
@@ -54,7 +61,8 @@ def main():
     cfg.pop("providers", None)
     cfg.pop("custom_providers", None)
 
-    with open(CONFIG_PATH, "w") as f:
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with CONFIG_PATH.open("w") as f:
         yaml.dump(cfg, f, default_flow_style=False)
 
     print("Hermes config updated:")

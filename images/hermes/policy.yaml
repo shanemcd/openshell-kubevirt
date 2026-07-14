@@ -11,7 +11,7 @@ filesystem_policy:
     - /app
     - /etc
     - /var/log
-    # Hermes / NemoClaw on the bootc guest
+    # Hermes / NemoClaw on the bootc guest (blueprint path is NemoClaw-only)
     - /opt/hermes
     - /opt/nemoclaw-blueprint
     - /usr/local

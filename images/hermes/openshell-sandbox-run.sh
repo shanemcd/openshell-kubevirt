@@ -39,7 +39,7 @@ if [ -n "$MODE" ]; then
 fi
 
 # Entrypoint comes from OPENSHELL_SANDBOX_COMMAND in the drop-in (guest default
-# nemoclaw-start-vm, or gateway/create override). Do not pass argv here so an
+# sandbox_command / create --env). Do not pass argv here so an
 # explicit metadata command wins via env; empty metadata uses the guest default.
 # In network-only mode the binary ignores process spawn; Hermes is sandbox-workload.
 exec /opt/openshell/bin/openshell-sandbox "${MODE_ARGS[@]}"
