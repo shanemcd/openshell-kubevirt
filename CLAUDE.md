@@ -59,7 +59,7 @@ openshell sandbox provider list hermes   # expect: github, slack, vertex-prod, a
 
 Single workflow: `.github/workflows/nightly-rebuild.yml` (06:00 UTC daily or manual dispatch).
 
-The pipeline rebases forks onto upstream, builds OCI images across repos, and pushes to GHCR. Cross-repo git uses a GitHub App installation token. Key jobs: rebase agent-sandbox + OpenShell + NemoClaw; build controller/gateway/supervisor/`nemoclaw-hermes`; build both bootc variants; convert each to containerDisk; layer site Hermes on the nemoclaw bootc.
+The pipeline rebases forks onto upstream, builds OCI images across repos, and pushes to GHCR. Cross-repo git uses a GitHub App installation token. Key jobs: rebase agent-sandbox + OpenShell + NemoClaw; build controller/gateway/supervisor/`nemoclaw-hermes`; build both bootc variants; convert each to containerDisk; layer site Hermes on the hermes-minimal bootc.
 
 Required repo settings: variable `APP_CLIENT_ID`, secret `APP_PRIVATE_KEY`.
 

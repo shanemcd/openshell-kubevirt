@@ -4,7 +4,7 @@ Build context for two guest variants that share this directory’s OpenShell
 bootstrap (systemd units, virtio prep, supervisor modes). Site CLIs (`gh`,
 `glab`, `gws`, `jirahhh`, `oc`/`kubectl`) live in
 [`shanemcd/toolbox`](https://github.com/shanemcd/toolbox) `openshell-kubevirt/`
-and layer on the **nemoclaw** bootc image.
+and layer on the **hermes-minimal** bootc image.
 
 | Variant | Containerfile | GHCR bootc | GHCR containerDisk | Workload |
 |---------|---------------|------------|--------------------|----------|

@@ -17,11 +17,11 @@ unset OPENSHELL_GATEWAY_ENDPOINT
 | `ghcr.io/shanemcd/openshell-gateway:nightly` | STS `openshell/openshell` |
 | `ghcr.io/shanemcd/openshell-supervisor:nightly` | Intermediate only (baked into bootc) |
 | `ghcr.io/shanemcd/nemoclaw-hermes:nightly` | Intermediate only (baked into nemoclaw bootc) |
-| `ghcr.io/shanemcd/hermes-sandbox-bootc:nightly` | NemoClaw variant OS image (input to containerDisk + site) |
+| `ghcr.io/shanemcd/hermes-sandbox-bootc:nightly` | NemoClaw variant OS image (input to containerDisk) |
 | `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | Default Sandbox `containers[0].image` (nemoclaw containerDisk) |
 | `ghcr.io/shanemcd/hermes-minimal-bootc:nightly` | Hermes-minimal OS image (no NemoClaw) |
 | `ghcr.io/shanemcd/hermes-minimal-kubevirt:nightly` | Optional Sandbox image (minimal containerDisk) |
-| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site containerDisk (toolbox layers on nemoclaw bootc) |
+| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site containerDisk (toolbox layers on hermes-minimal bootc) |
 
 Tags also include `YYYYMMDD` and `sha-<short>`. Prefer **digest** pins over moving tags.
 
@@ -64,9 +64,9 @@ Nightly publishes:
 
 | Image | Use |
 |-------|-----|
-| `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | NemoClaw guest (default / site base) |
+| `ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly` | NemoClaw guest (public nemoclaw guest) |
 | `ghcr.io/shanemcd/hermes-minimal-kubevirt:nightly` | Hermes-minimal guest (no config seals / MCP integrity) |
-| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site layers (`jirahhh`, `gh`, guest docs) on nemoclaw bootc |
+| `ghcr.io/shanemcd/hermes-site-kubevirt:nightly` | Site layers (`jirahhh`, `gh`, guest docs) on hermes-minimal bootc |
 
 ```bash
 DISK_DIG=$(crane digest ghcr.io/shanemcd/hermes-sandbox-kubevirt:nightly)

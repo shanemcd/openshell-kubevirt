@@ -138,7 +138,7 @@ KubeVirt VM support for the agent-sandbox controller so Hermes (NemoClaw) runs i
 
 **As of 2026-07-12 (defer privilege drop):** Tried `OPENSHELL_DEFER_PRIVILEGE_DROP=1` so NemoClaw could root-seal under the supervisor. Root+Landlock could not mint/write sandbox-owned `.env` (`ensure-api-key` EACCES) → crash loop / Provisioning.
 
-**As of 2026-07-14 — DUAL GUEST VARIANTS:** [`images/hermes/`](./images/hermes/) builds two images from shared bootstrap scripts. **nemoclaw** (`Containerfile.nemoclaw` → `hermes-sandbox-bootc` / `hermes-sandbox-kubevirt`) keeps NemoClaw start + config seals (default + site base). **hermes-minimal** (`Containerfile.minimal` → `hermes-minimal-bootc` / `hermes-minimal-kubevirt`) installs Hermes from the pinned NousResearch tarball and starts via `hermes-start.sh` with no MCP integrity guards. Both expose `/usr/local/bin/sandbox-entrypoint`. Nightly CI builds both bootc + containerDisk images.
+**As of 2026-07-14 — DUAL GUEST VARIANTS:** [`images/hermes/`](./images/hermes/) builds two images from shared bootstrap scripts. **nemoclaw** (`Containerfile.nemoclaw` → `hermes-sandbox-bootc` / `hermes-sandbox-kubevirt`) keeps NemoClaw start + config seals (public nemoclaw guest). **hermes-minimal** (`Containerfile.minimal` → `hermes-minimal-bootc` / `hermes-minimal-kubevirt`) installs Hermes from the pinned NousResearch tarball and starts via `hermes-start.sh` with no MCP integrity guards. Both expose `/usr/local/bin/sandbox-entrypoint`. Nightly CI builds both bootc + containerDisk images.
 
 **As of 2026-07-13 (match Pod privilege drop):** Guest no longer sets `OPENSHELL_DEFER_PRIVILEGE_DROP`. OpenShell chowns `/sandbox`, drops to `sandbox`, then Landlock + exec — same as Pods.
 

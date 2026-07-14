@@ -26,7 +26,7 @@ on:
         type: boolean
         default: false
       build_site_hermes:
-        description: Layer toolbox openshell-kubevirt/ onto nemoclaw bootc → hermes-site-bootc + hermes-site-kubevirt
+        description: Layer toolbox openshell-kubevirt/ onto hermes-minimal bootc → hermes-site-bootc + hermes-site-kubevirt
         type: boolean
         default: true
 
@@ -437,7 +437,7 @@ jobs:
 
   build-hermes-bootc:
     needs: [meta, rebases, build-openshell-supervisor, build-nemoclaw-hermes]
-    # NemoClaw variant → hermes-sandbox-bootc (site base + default guest).
+    # NemoClaw variant → hermes-sandbox-bootc (public nemoclaw guest).
     if: |
       always() &&
       !cancelled() &&
@@ -701,18 +701,18 @@ jobs:
   # Site Hermes layers live in shanemcd/toolbox (openshell-kubevirt/); CI is
   # centralized here so public bootc + site disk rebuild in one pipeline.
   build-hermes-site:
-    needs: [meta, build-hermes-bootc]
+    needs: [meta, build-hermes-minimal-bootc]
     if: |
       always() &&
       !cancelled() &&
       needs.meta.outputs.build_site_hermes == 'true' &&
-      needs.build-hermes-bootc.result == 'success'
+      needs.build-hermes-minimal-bootc.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
       BOOTC_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-site-bootc
       DISK_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-site-kubevirt
-      BASE_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-sandbox-bootc:nightly
+      BASE_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-minimal-bootc:nightly
     steps:
       - name: Checkout toolbox site layers
         uses: actions/checkout@v4
