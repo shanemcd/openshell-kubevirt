@@ -743,6 +743,23 @@ jobs:
             -t "${BOOTC_IMAGE}:nightly" \
             -f Containerfile .
 
+      # bib needs ~tens of GB; site job already pulled minimal + layered images.
+      - name: Free disk space before bootc-image-builder
+        run: |
+          set -euo pipefail
+          df -h
+          docker buildx prune -af || true
+          docker system prune -af --volumes || true
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY" || true
+          sudo apt-get clean || true
+          df -h
+
       - name: Login rootful podman to GHCR
         run: |
           set -euo pipefail
