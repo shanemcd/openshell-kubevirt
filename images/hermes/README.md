@@ -56,6 +56,9 @@ openshell sandbox create ... --env "SUPERVISOR_MODE=network"
 Network mode forces Hermes through the OpenShell proxy by entering the sandbox
 netns (`nsenter`), sourcing snapshotted `provider.env` + `/etc/sandbox/env`,
 and trusting `/etc/openshell-tls/{ca-bundle,openshell-ca}.pem`.
+`trust-openshell-ca.sh` (ExecStartPost) also installs `openshell-ca.pem` into
+`/etc/pki/ca-trust/source/anchors/` + `update-ca-trust` so tools that ignore
+`SSL_CERT_FILE` still trust the MITM proxy.
 
 L7 identity: network-only never spawns a process leaf, so the supervisor must
 adopt the sibling workload PID. OpenShell (`vm-runtime-backend`) watches

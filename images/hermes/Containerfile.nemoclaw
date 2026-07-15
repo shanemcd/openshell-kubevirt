@@ -114,6 +114,7 @@ COPY prepare-sandbox-volumes.sh /usr/local/lib/openshell/prepare-sandbox-volumes
 COPY openshell-sandbox-prep-env.sh /usr/local/lib/openshell/openshell-sandbox-prep-env.sh
 COPY openshell-sandbox-run.sh /usr/local/lib/openshell/openshell-sandbox-run.sh
 COPY sandbox-workload-run.sh /usr/local/lib/openshell/sandbox-workload-run.sh
+COPY trust-openshell-ca.sh /usr/local/lib/openshell/trust-openshell-ca.sh
 COPY openshell-supervisor-mode.sh /usr/local/lib/openshell/openshell-supervisor-mode
 COPY sandbox-volumes.service /etc/systemd/system/sandbox-volumes.service
 COPY openshell-sandbox.service /etc/systemd/system/openshell-sandbox.service
@@ -123,6 +124,7 @@ RUN chmod 755 /usr/local/lib/openshell/prepare-sandbox-volumes.sh \
       /usr/local/lib/openshell/openshell-sandbox-prep-env.sh \
       /usr/local/lib/openshell/openshell-sandbox-run.sh \
       /usr/local/lib/openshell/sandbox-workload-run.sh \
+      /usr/local/lib/openshell/trust-openshell-ca.sh \
       /usr/local/lib/openshell/openshell-supervisor-mode && \
     ln -sf /usr/local/lib/openshell/openshell-supervisor-mode /usr/local/sbin/openshell-supervisor-mode && \
     systemctl enable sandbox-volumes.service openshell-sandbox.service \

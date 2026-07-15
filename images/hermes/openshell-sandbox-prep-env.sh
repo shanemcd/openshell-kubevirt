@@ -127,6 +127,15 @@ fi
 # start the workload without a path unit or systemctl-from-script.
 if [ "${SUPERVISOR_MODE:-}" = "network" ]; then
   touch "${DROPIN_DIR}/want-workload"
+  # Nested podman/kind traffic is often attributed to pasta, short-lived
+  # /usr/lib/apt/methods/http, or fails identity entirely ("-(0)"). Strict
+  # binary TOFU also keys by path, so bookworm then trixie apt (different
+  # hashes, same path) denies the second image. Endpoint policy still
+  # enforces hosts; set OPENSHELL_NETWORK_BINARY_IDENTITY=true in
+  # /etc/sandbox/env if you need strict binary binding.
+  if ! grep -q '^OPENSHELL_NETWORK_BINARY_IDENTITY=' "$DROPIN_ENV" 2>/dev/null; then
+    echo "OPENSHELL_NETWORK_BINARY_IDENTITY=${OPENSHELL_NETWORK_BINARY_IDENTITY:-relaxed}" >>"$DROPIN_ENV"
+  fi
 else
   rm -f "${DROPIN_DIR}/want-workload"
 fi

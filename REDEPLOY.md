@@ -162,6 +162,29 @@ openshell sandbox create --from "$IMAGE" --name hermes ...
 
 To recreate the Sandbox CR but keep data, orphan the claim first (`remove ownerReferences`, label `agents.x-k8s.io/adoptable=true`), delete, recreate with the **same name** so the controller can adopt `workspace-<name>`. Prefer §2a when you only need a new guest OS.
 
+### 2c. Grow workspace PVC (clone + named claim passthrough)
+
+CRC hostpath does **not** support CSI volume expansion. To grow Hermes `/sandbox`:
+
+1. **Stop** the VM (`virtctl stop hermes`) and scale down `agent-sandbox-controller` so it does not auto-resume.
+2. Create a larger claim (e.g. `workspace-hermes-20gi`, 20Gi, same StorageClass).
+3. **Rsync** old→new via a Job that mounts both PVCs. On KubeVirt filesystem PVCs the payload is `disk.img` — after copy, `qemu-img resize … 20G` and offline `resize2fs` (privileged Job). Keep the old PVC as backup until verified.
+4. Deploy a controller that syncs named PVC claimNames (`syncVMPersistentVolumeClaims` on `kubevirt-backend`).
+5. **Patch** Sandbox `hermes`: remove `volumeClaimTemplates`; set `podTemplate.spec.volumes[].persistentVolumeClaim.claimName: workspace-hermes-20gi` with mount `workspace` → `/sandbox`.
+6. Scale the controller back up (it patches the VM claimName, then sets `running=true`). Confirm guest `df -h /sandbox` ≈ 20G and `.hermes/` present.
+
+**New creates** with an existing claim (gateway must include the OpenShell `--workspace-pvc` support):
+
+```bash
+openshell sandbox create --name hermes --workspace-pvc workspace-hermes-20gi --from "$IMAGE" ...
+# equivalent driver_config:
+# --driver-config-json '{"kubernetes":{"workspace_pvc":"workspace-hermes-20gi"}}'
+```
+
+That omits VCT and emits the PVC volume + `/sandbox` mount. Sandbox delete does **not** delete a passthrough claim.
+
+**Live cutover** without recreate: patch Sandbox claimName as above; controller syncs the VM volume; restart/start the VMI.
+
 ## 3. After every Hermes create / recreate — attach providers
 
 Provider links are **per-sandbox** and are wiped on **delete/recreate**. Inference can still work via the OpenShell inference bundle without an attach, but GitHub/Slack/Atlassian env rewrite will not. In-place disk upgrades (§2a) do **not** clear attaches.

@@ -17,6 +17,11 @@ SANDBOX_GID="${OPENSHELL_SANDBOX_GID:-10001}"
 
 log() { echo "sandbox-workload: $*" >&2; }
 
+# Ensure MITM CA is in the system trust store (idempotent; also ExecStartPost).
+if [ -x /usr/local/lib/openshell/trust-openshell-ca.sh ]; then
+  /usr/local/lib/openshell/trust-openshell-ca.sh || true
+fi
+
 # Already inside the target netns (re-exec via ip netns exec) — do this first.
 if [ "${SANDBOX_WORKLOAD_IN_NETNS:-}" = "1" ]; then
   echo $$ >"$ENTRYPOINT_PID" 2>/dev/null || true

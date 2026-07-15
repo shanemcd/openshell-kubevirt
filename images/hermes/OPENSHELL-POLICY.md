@@ -69,6 +69,8 @@ How to read lines:
 | Log | Meaning |
 |-----|---------|
 | `DENIED … reason:endpoint X:port is not allowed by any policy` | Add a `network_policies` endpoint (and binary). |
+| `DENIED … reason:connection not allowed by policy: METHOD /path` on **`inference.local`** | Not a missing network rule. OpenShell only routes OpenAI-shaped paths (`/v1/chat/completions`, `/v1/messages`, `/v1/models`, …). Hermes Ollama probes (`/api/show`, `/api/tags`, `/models`, …) are expected denials — ignore or stop the probe. |
+| `DENIED … binary '/tmp/…/rustup-init' not allowed` | Add `/tmp/**/rustup-init` (and curl) on the `rustup` / `static.rust-lang.org` rule. |
 | `DENIED … engine:ssrf … port 6443` | Hard block — OpenShell denies control-plane ports; do **not** try to allow `:6443`. |
 | `ALLOWED` then `NET:FAIL` | Policy permitted the dial; upstream/proxy still failed (TLS, rewrite, routing). |
 | `DENIED … failed to resolve peer binary` | Short-lived connect; retry or ensure the binary path is listed. |
@@ -146,6 +148,7 @@ network_policies:
    done
    ```
 7. **Persist** — after a working live `policy update` / `set`, copy the same change into `images/hermes/policy.yaml` in git so the next recreate matches.
+8. **Nested containers (podman/kind apt)** — with `SUPERVISOR_MODE=network`, Hermes defaults `OPENSHELL_NETWORK_BINARY_IDENTITY=relaxed` so endpoint allowlists apply without binary/TOFU binding. Strict mode breaks when identity is `-(0)`, `pasta.avx2`, or when bookworm/trixie share `/usr/lib/apt/methods/http` with different hashes. Host/port policy still applies. Override with `OPENSHELL_NETWORK_BINARY_IDENTITY=true` in `/etc/sandbox/env` if needed.
 
 ## Workflow when you are blocked
 

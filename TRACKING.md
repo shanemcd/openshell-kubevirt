@@ -1,6 +1,10 @@
 # KubeVirt VM Hermes: Handoff + Bake Results
 
-> **Read this first if you have no context.** This is the living handoff for running Hermes (NemoClaw) as a KubeVirt VM on CRC via OpenShell’s k8s driver + agent-sandbox `runtimeBackend: VirtualMachine`. **Home of this doc:** [`shanemcd/openshell-kubevirt`](https://github.com/shanemcd/openshell-kubevirt). Last updated **2026-07-12 (evening ET)**.
+> **Read this first if you have no context.** This is the living handoff for running Hermes (NemoClaw) as a KubeVirt VM on CRC via OpenShell’s k8s driver + agent-sandbox `runtimeBackend: VirtualMachine`. **Home of this doc:** [`shanemcd/openshell-kubevirt`](https://github.com/shanemcd/openshell-kubevirt). Last updated **2026-07-14 (evening ET)**.
+
+## Current state (2026-07-14) — workspace 20Gi cutover
+
+Live Hermes uses named PVC passthrough **`workspace-hermes-20gi`** (guest `/dev/vdc` ≈ 20G). Old **`workspace-hermes`** kept as backup. agent-sandbox syncs claimName on reconcile; OpenShell supports `--workspace-pvc` / `kubernetes.workspace_pvc` for new creates. Grow procedure: [`REDEPLOY.md`](./REDEPLOY.md) §2c.
 
 ## Current state (2026-07-12 late night) — start here
 
@@ -450,7 +454,7 @@ Key code:
 - agent-sandbox: `collectVMVolumeMounts`, `appendVMClaimDisks`, `virtioDiskSerial`, `buildPrepareWritableRootsScript` in `controllers/sandbox_controller.go`
 - OpenShell: `workspace_persistence` on k8s driver config; `sandbox_to_k8s_spec_vm` + Pod `apply_workspace_persistence` gated on the same flag; unit tests `workspace_*` in `driver.rs`
 
-OpenShell CLI has **no** volume flag — persistence is gateway/driver config only.
+OpenShell CLI: `--workspace-pvc <claim>` (and `{"kubernetes":{"workspace_pvc":"…"}}`) omits VCT and attaches an existing claim at `/sandbox`. agent-sandbox prefers that explicit claimName over VCT and syncs it onto live VMs (`syncVMPersistentVolumeClaims`). See [`REDEPLOY.md`](./REDEPLOY.md) §2c.
 
 ## Code changes
 
