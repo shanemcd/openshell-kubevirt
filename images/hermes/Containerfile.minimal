@@ -41,8 +41,16 @@ RUN dnf install -y \
 
 RUN python3.13 -m pip install --no-cache-dir --break-system-packages "uv==${UV_VERSION}"
 RUN mkdir -p /opt/hermes \
-    && curl -fsSL "https://github.com/NousResearch/hermes-agent/archive/refs/tags/${HERMES_VERSION}.tar.gz" \
-         -o /tmp/hermes.tar.gz \
+    && set -eu; \
+       n=0; \
+       until curl -fSL --retry 8 --retry-delay 5 --retry-all-errors --retry-connrefused \
+                 "https://github.com/NousResearch/hermes-agent/archive/refs/tags/${HERMES_VERSION}.tar.gz" \
+                 -o /tmp/hermes.tar.gz; do \
+         n=$((n+1)); \
+         if [ "$n" -ge 5 ]; then echo "Exhausted retries fetching hermes tarball" >&2; exit 1; fi; \
+         echo "codeload rate-limit/transient error fetching hermes tarball, retry $n/5..." >&2; \
+         sleep 20; \
+       done \
     && printf '%s  /tmp/hermes.tar.gz\n' "${HERMES_TARBALL_SHA256}" > /tmp/hermes.tar.gz.sha256 \
     && sha256sum -c /tmp/hermes.tar.gz.sha256 \
     && tar -xzf /tmp/hermes.tar.gz -C /opt/hermes --strip-components=1 \
