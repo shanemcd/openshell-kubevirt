@@ -1,6 +1,6 @@
 # agent-sandbox VirtualMachine backend — piece-by-piece demo
 
-> **Scope:** [`kubernetes-sigs/agent-sandbox`](https://github.com/kubernetes-sigs/agent-sandbox) only (fork branch [`kubevirt-backend`](https://github.com/andyetanotherorg/agent-sandbox/tree/kubevirt-backend)). No OpenShell, Hermes, or NemoClaw. Use this to walk a reviewer through what the controller actually does when `runtimeBackend: VirtualMachine`.
+> **Scope:** [`kubernetes-sigs/agent-sandbox`](https://github.com/kubernetes-sigs/agent-sandbox) only (fork branch [`kubevirt-backend`](https://github.com/shanemcd/agent-sandbox/tree/kubevirt-backend)). No OpenShell, Hermes, or NemoClaw. Use this to walk a reviewer through what the controller actually does when `runtimeBackend: VirtualMachine`.
 
 ---
 
