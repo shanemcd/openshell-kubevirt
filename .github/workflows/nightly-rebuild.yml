@@ -443,7 +443,20 @@ jobs:
 
   build-nemoclaw-hermes:
     needs: [meta, rebases, rebase-nemoclaw]
-    if: needs.meta.outputs.push_images == 'true'
+    # PARKED 2026-09-11 (Shane: 'more trouble than it's worth').
+    # Sole producer of the nemoclaw hermes-sandbox-bootc image. Its Dockerfile
+    # integrity gate is red: agents/hermes/Dockerfile ~L470 does `sha256sum -c`
+    # over image-build-probes.py against
+    # NEMOCLAW_HERMES_IMAGE_BUILD_PROBES_SHA256=7c74c3f... and the file's current
+    # content no longer matches. Re-pinning that checksum to force green is
+    # exactly what watchdog rule 4 forbids unattended. No nightly cluster
+    # workload consumes this image; its only consumer is build-hermes-bootc,
+    # which stays gated on this job's result (see build_hermes guard note below).
+    # TO RE-ENABLE: restore
+    #   if: needs.meta.outputs.push_images == 'true'
+    # after confirming the probes-file change is expected and re-pinning
+    # NEMOCLAW_HERMES_IMAGE_BUILD_PROBES_SHA256 in NemoClaw.
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
