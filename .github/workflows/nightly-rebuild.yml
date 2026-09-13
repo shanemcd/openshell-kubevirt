@@ -313,7 +313,7 @@ jobs:
         id: capture
         if: always()
         env:
-          IMAGE: "${REGISTRY}/agent-sandbox-controller"
+          IMAGE: "${{ env.REGISTRY }}/agent-sandbox-controller"
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
@@ -409,7 +409,7 @@ jobs:
         id: capture
         if: always()
         env:
-          IMAGE: "${REGISTRY}/openshell-gateway"
+          IMAGE: "${{ env.REGISTRY }}/openshell-gateway"
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
@@ -499,7 +499,7 @@ jobs:
         id: capture
         if: always()
         env:
-          IMAGE: "${REGISTRY}/openshell-supervisor"
+          IMAGE: "${{ env.REGISTRY }}/openshell-supervisor"
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
@@ -582,7 +582,7 @@ jobs:
         id: capture
         if: always()
         env:
-          IMAGE: "${REGISTRY}/nemoclaw-hermes"
+          IMAGE: "${{ env.REGISTRY }}/nemoclaw-hermes"
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
@@ -675,7 +675,7 @@ jobs:
         id: capture
         if: always()
         env:
-          IMAGE: "${REGISTRY}/hermes-sandbox-bootc"
+          IMAGE: "${{ env.REGISTRY }}/hermes-sandbox-bootc"
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
@@ -762,7 +762,7 @@ jobs:
         id: capture
         if: always()
         env:
-          IMAGE: "${REGISTRY}/hermes-minimal-bootc"
+          IMAGE: "${{ env.REGISTRY }}/hermes-minimal-bootc"
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
@@ -859,7 +859,7 @@ jobs:
         id: capture
         if: always()
         env:
-          IMAGE: "${REGISTRY}/hermes-sandbox-kubevirt"
+          IMAGE: "${{ env.REGISTRY }}/hermes-sandbox-kubevirt"
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
@@ -955,7 +955,7 @@ jobs:
         id: capture
         if: always()
         env:
-          IMAGE: "${REGISTRY}/hermes-minimal-kubevirt"
+          IMAGE: "${{ env.REGISTRY }}/hermes-minimal-kubevirt"
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
