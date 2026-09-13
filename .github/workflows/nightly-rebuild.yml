@@ -317,8 +317,19 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          # Download crane if not present — works on both single-arch and
+          # manifest-list images, unlike docker buildx imagetools inspect.
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
+          # Fallback: manifest-list images may still have a Digest: line.
           if [[ -z "${DIGEST:-}" ]]; then
             DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
@@ -413,8 +424,16 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
           if [[ -z "${DIGEST:-}" ]]; then
             DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
@@ -503,8 +522,16 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly kubevirt; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
           if [[ -z "${DIGEST:-}" ]]; then
             DIGEST=$(docker buildx imagetools inspect "${IMAGE}:kubevirt" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
@@ -586,10 +613,18 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:kubevirt" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly kubevirt; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
           if [[ -z "${DIGEST:-}" ]]; then
-            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:kubevirt" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
           fi
           echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
@@ -679,8 +714,16 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
           if [[ -z "${DIGEST:-}" ]]; then
             DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
@@ -766,8 +809,16 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
           if [[ -z "${DIGEST:-}" ]]; then
             DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
@@ -863,8 +914,16 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
           if [[ -z "${DIGEST:-}" ]]; then
             DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
@@ -959,8 +1018,16 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
           if [[ -z "${DIGEST:-}" ]]; then
             DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
@@ -1092,8 +1159,16 @@ jobs:
           DATE: ${{ needs.meta.outputs.date }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
-            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          CRANE_BIN="$(mktemp -d)/crane"
+          curl -sL "https://github.com/google/go-containerregistry/releases/latest/download/crane_linux_amd64" -o "$CRANE_BIN"
+          chmod +x "$CRANE_BIN"
+          DIGEST="" 
+          for tag in "${DATE}" nightly; do
+            DIGEST=$($CRANE_BIN digest "${IMAGE}:${tag}" 2>/dev/null) || true
+            if [[ -n "$DIGEST" ]]; then
+              break
+            fi
+          done
           if [[ -z "${DIGEST:-}" ]]; then
             DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
               2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
