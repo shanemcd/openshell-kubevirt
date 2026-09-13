@@ -261,6 +261,9 @@ jobs:
     if: needs.meta.outputs.push_images == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -282,6 +285,7 @@ jobs:
 
       - name: Build and push controller
         working-directory: src
+        id: build
         env:
           DATE: ${{ needs.meta.outputs.date }}
           SHA: ${{ needs.rebase-agent-sandbox.outputs.sha }}
@@ -305,11 +309,35 @@ jobs:
             -f Dockerfile \
             .
 
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${REGISTRY}/agent-sandbox-controller"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:nightly" >> "$GITHUB_OUTPUT"
+          fi
+
   build-openshell-gateway:
     needs: [meta, rebases, rebase-openshell]
     if: needs.meta.outputs.push_images == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -346,6 +374,7 @@ jobs:
 
       - name: Stage gateway binary and push image
         working-directory: src
+        id: build
         env:
           DATE: ${{ needs.meta.outputs.date }}
           SHA: ${{ needs.rebase-openshell.outputs.sha }}
@@ -376,11 +405,35 @@ jobs:
               "$SRC"
           done
 
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${REGISTRY}/openshell-gateway"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:nightly" >> "$GITHUB_OUTPUT"
+          fi
+
   build-openshell-supervisor:
     needs: [meta, rebases, rebase-openshell]
     if: needs.meta.outputs.push_images == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -413,6 +466,7 @@ jobs:
 
       - name: Stage supervisor binary and push image
         working-directory: src
+        id: build
         env:
           DATE: ${{ needs.meta.outputs.date }}
           SHA: ${{ needs.rebase-openshell.outputs.sha }}
@@ -441,6 +495,27 @@ jobs:
               "$SRC"
           done
 
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${REGISTRY}/openshell-supervisor"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:kubevirt" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:kubevirt" >> "$GITHUB_OUTPUT"
+          fi
+
   build-nemoclaw-hermes:
     needs: [meta, rebases, rebase-nemoclaw]
     # PARKED 2026-09-11 (Shane: 'more trouble than it's worth').
@@ -459,6 +534,9 @@ jobs:
     if: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -478,6 +556,7 @@ jobs:
 
       - name: Build and push nemoclaw-hermes
         working-directory: src
+        id: build
         env:
           DATE: ${{ needs.meta.outputs.date }}
           SHA: ${{ needs.rebase-nemoclaw.outputs.sha }}
@@ -499,6 +578,27 @@ jobs:
             -f agents/hermes/Dockerfile \
             .
 
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${REGISTRY}/nemoclaw-hermes"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:kubevirt" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:kubevirt" >> "$GITHUB_OUTPUT"
+          fi
+
   build-hermes-bootc:
     needs: [meta, rebases, build-openshell-supervisor, build-nemoclaw-hermes]
     # NemoClaw variant → hermes-sandbox-bootc (public nemoclaw guest).
@@ -515,6 +615,9 @@ jobs:
         needs.meta.outputs.push_images != 'true' &&
         needs.meta.outputs.build_hermes != 'true'
       )
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -568,6 +671,27 @@ jobs:
             -f Containerfile.nemoclaw \
             .
 
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${REGISTRY}/hermes-sandbox-bootc"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:nightly" >> "$GITHUB_OUTPUT"
+          fi
+
   build-hermes-minimal-bootc:
     needs: [meta, rebases, build-openshell-supervisor]
     # Hermes-minimal variant → hermes-minimal-bootc (no NemoClaw).
@@ -583,6 +707,9 @@ jobs:
         needs.meta.outputs.push_images != 'true' &&
         needs.meta.outputs.build_hermes_minimal != 'true'
       )
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -631,6 +758,27 @@ jobs:
             -f Containerfile.minimal \
             .
 
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${REGISTRY}/hermes-minimal-bootc"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:nightly" >> "$GITHUB_OUTPUT"
+          fi
+
   build-hermes-containerdisk:
     needs: [meta, build-hermes-bootc]
     if: |
@@ -640,6 +788,9 @@ jobs:
       needs.build-hermes-bootc.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     steps:
       - uses: actions/checkout@v4
 
@@ -673,6 +824,7 @@ jobs:
           additional-args: --use-librepo=True
 
       - name: Package and push hermes-sandbox-kubevirt
+        id: build
         env:
           DATE: ${{ needs.meta.outputs.date }}
           QCOW2: ${{ steps.bib.outputs.qcow2-output-path }}
@@ -703,6 +855,27 @@ jobs:
             -t "${IMAGE}:sha-${SHORT}" \
             "$PKG"
 
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${REGISTRY}/hermes-sandbox-kubevirt"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:nightly" >> "$GITHUB_OUTPUT"
+          fi
+
   build-hermes-minimal-containerdisk:
     needs: [meta, build-hermes-minimal-bootc]
     if: |
@@ -712,6 +885,9 @@ jobs:
       needs.build-hermes-minimal-bootc.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     steps:
       - uses: actions/checkout@v4
 
@@ -745,6 +921,7 @@ jobs:
           additional-args: --use-librepo=True
 
       - name: Package and push hermes-minimal-kubevirt
+        id: build
         env:
           DATE: ${{ needs.meta.outputs.date }}
           QCOW2: ${{ steps.bib.outputs.qcow2-output-path }}
@@ -774,6 +951,27 @@ jobs:
             -t "${IMAGE}:sha-${SHORT}" \
             "$PKG"
 
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${REGISTRY}/hermes-minimal-kubevirt"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:nightly" >> "$GITHUB_OUTPUT"
+          fi
+
   # Site Hermes layers live in public shanemcd/toolbox (openshell-kubevirt/);
   # images still publish to ghcr.io/${{ github.repository_owner }}.
   build-hermes-site:
@@ -785,6 +983,9 @@ jobs:
       needs.build-hermes-minimal-bootc.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    outputs:
+      image_ref: ${{ steps.capture.outputs.image_ref }}
+      image_digest: ${{ steps.capture.outputs.image_digest }}
     env:
       BOOTC_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-site-bootc
       DISK_IMAGE: ghcr.io/${{ github.repository_owner }}/hermes-site-kubevirt
@@ -882,3 +1083,177 @@ jobs:
             -t "${DISK_IMAGE}:${DATE}" \
             -t "${DISK_IMAGE}:nightly" \
             "$PKG"
+
+      - name: Capture image digest
+        id: capture
+        if: always()
+        env:
+          IMAGE: "${{ env.DISK_IMAGE }}"
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          set -euo pipefail
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${DATE}" \
+            2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          if [[ -z "${DIGEST:-}" ]]; then
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:nightly" \
+              2>/dev/null | awk '/^Digest:/ { print $2; exit }') || true
+          fi
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${DIGEST:-}" ]]; then
+            echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_ref=${IMAGE}:nightly" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Report build metadata — prints a table of all produced images and uploads
+  # a JSON artifact with the full metadata for downstream consumption.
+  # ---------------------------------------------------------------------------
+  report-build-metadata:
+    needs:
+      - meta
+      - build-agent-sandbox
+      - build-openshell-gateway
+      - build-openshell-supervisor
+      - build-nemoclaw-hermes
+      - build-hermes-bootc
+      - build-hermes-minimal-bootc
+      - build-hermes-containerdisk
+      - build-hermes-minimal-containerdisk
+      - build-hermes-site
+    if: always() && needs.meta.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      manifest: ${{ steps.manifest.outputs.manifest }}
+    steps:
+      - name: Print build summary
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DATE: ${{ needs.meta.outputs.date }}
+        run: |
+          echo "## Build Report — ${{ github.workflow }} (run ${{ github.run_number }})"
+          echo "Run: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Date: $DATE" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch/Tag: \`${{ github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          printf "| Image | Digest |" >> "$GITHUB_STEP_SUMMARY"
+          printf "\n|-------|--------|" >> "$GITHUB_STEP_SUMMARY"
+
+          print_image() {
+            local label="$1"
+            local ref="$2"
+            if [[ -n "$ref" && "$ref" != "" ]]; then
+              printf "\n| %s | \`%s\` |" "$label" "$ref" >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf "\n| %s | _(not built or unavailable)_ |" "$label" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          }
+
+          print_image "agent-sandbox-controller"  "${{ needs.build-agent-sandbox.outputs.image_ref }}"
+          print_image "openshell-gateway"        "${{ needs.build-openshell-gateway.outputs.image_ref }}"
+          print_image "openshell-supervisor"     "${{ needs.build-openshell-supervisor.outputs.image_ref }}"
+          print_image "nemoclaw-hermes"          "${{ needs.build-nemoclaw-hermes.outputs.image_ref }}"
+          print_image "hermes-sandbox-bootc"     "${{ needs.build-hermes-bootc.outputs.image_ref }}"
+          print_image "hermes-minimal-bootc"     "${{ needs.build-hermes-minimal-bootc.outputs.image_ref }}"
+          print_image "hermes-sandbox-kubevirt"  "${{ needs.build-hermes-containerdisk.outputs.image_ref }}"
+          print_image "hermes-minimal-kubevirt"  "${{ needs.build-hermes-minimal-containerdisk.outputs.image_ref }}"
+          print_image "hermes-site-kubevirt"     "${{ needs.build-hermes-site.outputs.image_ref }}"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build manifest JSON
+        id: manifest
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUM: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # Helper: wrap a value as a JSON string (empty → null in JSON).
+          json_str() {
+            if [[ -n "${1:-}" ]]; then
+              printf '"%s"' "$1"
+            else
+              printf 'null'
+            fi
+          }
+
+          cat <<JSONEOF > manifest.json
+          {
+            "run": {
+              "url": "${RUN_URL}",
+              "number": ${RUN_NUM},
+              "sha": "${SHA}",
+              "ref": "${REF}",
+              "date": "${DATE}",
+              "repository": "${REPO}"
+            },
+            "images": {
+              "agent-sandbox-controller": {
+                "image": "ghcr.io/${{ github.repository_owner }}/agent-sandbox-controller",
+                "digest": $(json_str "${{ needs.build-agent-sandbox.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-agent-sandbox.outputs.image_ref }}")
+              },
+              "openshell-gateway": {
+                "image": "ghcr.io/${{ github.repository_owner }}/openshell-gateway",
+                "digest": $(json_str "${{ needs.build-openshell-gateway.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-openshell-gateway.outputs.image_ref }}")
+              },
+              "openshell-supervisor": {
+                "image": "ghcr.io/${{ github.repository_owner }}/openshell-supervisor",
+                "digest": $(json_str "${{ needs.build-openshell-supervisor.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-openshell-supervisor.outputs.image_ref }}")
+              },
+              "nemoclaw-hermes": {
+                "image": "ghcr.io/${{ github.repository_owner }}/nemoclaw-hermes",
+                "digest": $(json_str "${{ needs.build-nemoclaw-hermes.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-nemoclaw-hermes.outputs.image_ref }}")
+              },
+              "hermes-sandbox-bootc": {
+                "image": "ghcr.io/${{ github.repository_owner }}/hermes-sandbox-bootc",
+                "digest": $(json_str "${{ needs.build-hermes-bootc.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-hermes-bootc.outputs.image_ref }}")
+              },
+              "hermes-minimal-bootc": {
+                "image": "ghcr.io/${{ github.repository_owner }}/hermes-minimal-bootc",
+                "digest": $(json_str "${{ needs.build-hermes-minimal-bootc.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-hermes-minimal-bootc.outputs.image_ref }}")
+              },
+              "hermes-sandbox-kubevirt": {
+                "image": "ghcr.io/${{ github.repository_owner }}/hermes-sandbox-kubevirt",
+                "digest": $(json_str "${{ needs.build-hermes-containerdisk.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-hermes-containerdisk.outputs.image_ref }}")
+              },
+              "hermes-minimal-kubevirt": {
+                "image": "ghcr.io/${{ github.repository_owner }}/hermes-minimal-kubevirt",
+                "digest": $(json_str "${{ needs.build-hermes-minimal-containerdisk.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-hermes-minimal-containerdisk.outputs.image_ref }}")
+              },
+              "hermes-site-kubevirt": {
+                "image": "ghcr.io/${{ github.repository_owner }}/hermes-site-kubevirt",
+                "digest": $(json_str "${{ needs.build-hermes-site.outputs.image_digest }}"),
+                "ref": $(json_str "${{ needs.build-hermes-site.outputs.image_ref }}")
+              }
+            }
+          }
+          JSONEOF
+
+          # Pretty-print for the summary table
+          cat manifest.json
+
+          # Store as workflow output for downstream jobs (if any)
+          MANIFEST=$(cat manifest.json | tr -d '\n' | sed 's/"/\\"/g')
+          echo "manifest=${MANIFEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-manifest
+          path: manifest.json
+          retention-days: 30
