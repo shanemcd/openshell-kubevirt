@@ -1237,9 +1237,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: openshell-cli
-          path: |
-            dist/openshell-cli-linux-x86_64.tar.gz
-            dist/openshell-cli-checksums-sha256.txt
+          # single directory scalar: multi-line path blocks have been shown to
+          # collapse into one bogus pattern and upload NOTHING as a warning-only
+          # no-op. if-no-files-found turns that class of failure into a hard red.
+          path: dist
+          if-no-files-found: error
           retention-days: 30
 
   report-build-metadata:
