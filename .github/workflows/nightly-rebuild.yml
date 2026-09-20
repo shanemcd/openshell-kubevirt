@@ -1235,6 +1235,7 @@ jobs:
           ls -la "$STAGE"
 
       - uses: actions/upload-artifact@v4
+        working-directory: src   # build step wrote src/dist; default cwd is workspace root
         with:
           name: openshell-cli
           # single directory scalar: multi-line path blocks have been shown to
