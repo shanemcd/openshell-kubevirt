@@ -17,7 +17,7 @@ FROM ${OPENSHELL_SUPERVISOR_IMAGE} AS openshell-supervisor
 FROM quay.io/fedora/fedora-bootc:44
 
 # ── OpenShell sandbox supervisor (from supervisor container image) ────
-COPY --from=openshell-supervisor /openshell-sandbox /opt/openshell/bin/openshell-sandbox
+COPY --from=openshell-supervisor /openshell-supervisor /opt/openshell/bin/openshell-sandbox
 RUN chmod 755 /opt/openshell/bin/openshell-sandbox && \
     ln -s /opt/openshell/bin/openshell-sandbox /openshell-sandbox && \
     mkdir -p /etc/openshell /etc/openshell-tls/client /sandbox /opt/data
