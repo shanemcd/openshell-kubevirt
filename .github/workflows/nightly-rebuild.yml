@@ -1184,6 +1184,64 @@ jobs:
   # Report build metadata — prints a table of all produced images and uploads
   # a JSON artifact with the full metadata for downstream consumption.
   # ---------------------------------------------------------------------------
+  # Upstream ships openshell-cli as GitHub release assets only; this fork's
+  # sandbox egress policy blocks the asset CDN, so the watchdog provisions the
+  # CLI from this artifact instead. Built from the same rebase SHA as the
+  # gateway so client and server schema always match (single source: rebase-openshell.outputs.sha).
+  build-openshell-cli:
+    needs: [meta, rebases, rebase-openshell]
+    if: needs.meta.outputs.push_images == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/OpenShell
+          ref: ${{ needs.rebase-openshell.outputs.sha }}
+          path: src
+          fetch-depth: 0
+
+      - uses: jdx/mise-action@v2
+        with:
+          working_directory: src
+          cache: true
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src
+          shared-key: openshell-cli
+          prefix-key: v1-cli
+          cache-on-failure: true
+
+      - name: Build openshell CLI (release, gnu static like gateway)
+        working-directory: src
+        id: build
+        env:
+          SHA: ${{ needs.rebase-openshell.outputs.sha }}
+          MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHORT="${SHA:0:7}"
+          mise install --locked
+          cargo build --release -p openshell-cli
+          BIN="$(cargo metadata --workspace --format-version 1 | python3 -c 'import json,sys; m=json.load(sys.stdin); pkg=next(p for p in m["packages"] if p["name"]=="openshell-cli"); print(next(t["target"]["name"] for t in pkg["targets"] if "bin" in t["kind"]))')"
+          SRC="target/release/${BIN}"
+          test -x "$SRC"
+          STAGE="dist"
+          mkdir -p "$STAGE"
+          tar -C "$(dirname "$SRC")" -czf "$STAGE/openshell-cli-linux-x86_64.tar.gz" "$BIN"
+          ( cd "$STAGE" && sha256sum "openshell-cli-linux-x86_64.tar.gz" > openshell-cli-checksums-sha256.txt )
+          echo "sha=${SHORT}" >> "$GITHUB_OUTPUT"
+          ls -la "$STAGE"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openshell-cli
+          path: |
+            dist/openshell-cli-linux-x86_64.tar.gz
+            dist/openshell-cli-checksums-sha256.txt
+          retention-days: 30
+
   report-build-metadata:
     needs:
       - meta
@@ -1196,6 +1254,7 @@ jobs:
       - build-hermes-containerdisk
       - build-hermes-minimal-containerdisk
       - build-hermes-site
+      - build-openshell-cli
     if: always() && needs.meta.result == 'success'
     runs-on: ubuntu-latest
     outputs:
@@ -1235,6 +1294,7 @@ jobs:
           print_image "hermes-sandbox-kubevirt"  "${{ needs.build-hermes-containerdisk.outputs.image_ref }}"
           print_image "hermes-minimal-kubevirt"  "${{ needs.build-hermes-minimal-containerdisk.outputs.image_ref }}"
           print_image "hermes-site-kubevirt"     "${{ needs.build-hermes-site.outputs.image_ref }}"
+          printf "\n| openshell-cli | artifact \`openshell-cli\` (tar.gz + sha256) |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build manifest JSON
