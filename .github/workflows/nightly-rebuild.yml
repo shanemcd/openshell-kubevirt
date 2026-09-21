@@ -1,8 +1,10 @@
 name: Nightly rebase and rebuild
 
+# Dispatch-only: the Hermes Nightly Rebuild Watchdog (cron) wakes, clears
+# skill TODOs, dispatches THIS workflow, polls, remediates, and validates.
+# Keeping it off the Actions scheduler also makes every run an explicit,
+# attributable event the watchdog can correlate with its own mutations.
 on:
-  schedule:
-    - cron: "0 6 * * *" # 06:00 UTC
   workflow_dispatch:
     inputs:
       rebase:
